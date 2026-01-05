@@ -1,0 +1,6 @@
+REWARD_MAPPING = {
+    "X": 0,
+    "OK": 5,
+    "Good": 50,
+    "Perfect": 100,
+}

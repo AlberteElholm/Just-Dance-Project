@@ -19,6 +19,8 @@ with mss.mss() as sct:
 
 
 def classify_pixel(r, g, b):
+    if r < 40 and g < 40 and b < 40:
+        return "None"
     if r > 200 and g < 80 and b < 80:
         return "X"          # red
     if r > 200 and g > 150 and b < 80:

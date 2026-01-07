@@ -3,8 +3,8 @@ import mss
 from pynput import mouse
 m = mouse.Controller()
 
-PIXEL_X = 280  
-PIXEL_Y = 553  
+PIXEL_X = 280 #280 rasputin  
+PIXEL_Y = 446 #553  
 
 POLL_HZ = 248                 # how often we sample the pixel
 ARM_ON_UNKNOWN = False       # keep False to avoid noisy triggers
@@ -12,15 +12,15 @@ DEBUG = False                 # set False when done
 
 # Beat-based re-arm settings
 BPM = 124                    # song tempo
-SPEED_MULTIPLIER = 2       # speed up (>1.0) or slow down (<1.0) the rearm timing
-COOLDOWN_MS = 100            # We primarily rely on re-arming (message disappears) rather than cooldown.
+SPEED_MULTIPLIER = 10       # speed up (>1.0) or slow down (<1.0) the rearm timing
+COOLDOWN_MS = 500/SPEED_MULTIPLIER            # We primarily rely on re-arming (message disappears) rather than cooldown.
 
 #Pixel reader
 sct = mss.mss()
 def read_rgb(x, y):
     img = sct.grab({"top": y, "left": x, "width": 1, "height": 1})
-        r, g, b = img.pixel(0, 0)
-        return r, g, b
+    r, g, b = img.pixel(0, 0)
+    return r, g, b
 
 #Pixel classifier
 def classify_pixel(r, g, b):
@@ -73,7 +73,7 @@ def detect_point_events():
 
         # Re-arm when message is gone or after rearm_frames time has passed
         rearm_threshold_ms = 1/((124/60)*SPEED_MULTIPLIER)
-        if is_clear or ((now - last_event_time)>= rearm_threshold_ms):
+        if is_clear: #or ((now - last_event_time)>= rearm_threshold_ms):
             armed = True
 
         # Fire event on first appearance

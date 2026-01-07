@@ -55,7 +55,7 @@ def detect_point_events():
       After firing, we won't fire again until we see label == "None"
       (i.e., message disappeared).
     """
-    dt = 1.0 / POLL_HZ
+    dt = 1.0 / POLL_HZ #time step between samples
 
     armed = True
     last_event_time = 0.0

@@ -110,7 +110,7 @@ if __name__ == "__main__":
    print("Listening for new point-message events... (Ctrl+C to stop)")
    for ev in detect_point_events():
 
-        total_score = x_count * 0 + ok_count * 3 + good_count * 15 + perfect_count * 30
+        total_score = x_count * 0 + ok_count * 0.3 + good_count * 0.5 + perfect_count * 1.0
         print(f"EVENT: label={ev['label']} dt={ev['dt']:.3f}s rgb={ev['rgb']} count: {count} total score: {total_score}")
         count+=1
 

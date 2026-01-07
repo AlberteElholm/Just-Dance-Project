@@ -1,35 +1,57 @@
-import pyautogui
+from dolphin import event, gui, controller
+from typing import TypedDict
 import time
-from dolphin import event
+count=0
 
-async def main():
-    while True:
-        await event.frameadvance()
-        print('script is running')
-# ---- FAIL-SAFE ----
-# Moving the mouse to the top-left corner aborts the script
-pyautogui.FAILSAFE = True
-pyautogui.PAUSE = 0.01  # small delay between actions
+#actions
+scale = 0.8
 
-# ---- BUTTON PRESS ----
-def tap(key, duration=0.05):
-    """Press and release a key quickly."""
-    pyautogui.keyDown(key)
-    time.sleep(duration)
-    pyautogui.keyUp(key)
+frames_per_action = 3
 
-# ---- BUTTON HOLD ----
-def hold(key, hold_time):
-    """Hold a key for a given amount of time (seconds)."""
-    pyautogui.keyDown(key)
-    time.sleep(hold_time)
-    pyautogui.keyUp(key)
+idle = controller.set_wiimote_acceleration(0,0,0,0)*scale
 
-# ---- EXAMPLE USAGE ----
-try:
-    while True:
-        tap('a')          # quick press of 'a'
-        time.sleep(1)
-        hold('w', 2.0)    # hold 'w' for 2 seconds
-except pyautogui.FailSafeException:
-    print("Fail-safe triggered. Script stopped.")
+left = controller.set_wiimote_acceleration(0,-100,0,0)*scale
+right = controller.set_wiimote_acceleration(0,100,0,0)*scale
+up = controller.set_wiimote_acceleration(0,0,100,0)*scale
+down = controller.set_wiimote_acceleration(0,0,-100,0)*scale
+forward = controller.set_wiimote_acceleration(0,0,0,100)*scale
+backward = controller.set_wiimote_acceleration(0,0,0,-100)*scale
+
+up_left = controller.set_wiimote_acceleration(0,-100,100,0)*scale
+up_right = controller.set_wiimote_acceleration(0,100,100,0)*scale
+down_left = controller.set_wiimote_acceleration(0,-100,-100,0)*scale
+down_right = controller.set_wiimote_acceleration(0,100,-100,0)*scale
+forward_up = controller.set_wiimote_acceleration(0,0,100,100)*scale
+forward_down = controller.set_wiimote_acceleration(0,0,-100,100)*scale
+forward_left = controller.set_wiimote_acceleration(0,-100,0,100)*scale
+forward_right = controller.set_wiimote_acceleration(0,100,0,100)*scale
+backward_up = controller.set_wiimote_acceleration(0,0,100,-100)*scale
+backward_down = controller.set_wiimote_acceleration(0,0,-100,-100)*scale
+backward_left = controller.set_wiimote_acceleration(0,-100,0,-100)*scale
+backward_right = controller.set_wiimote_acceleration(0,100,0,-100)*scale
+
+forward_up_left = controller.set_wiimote_acceleration(0,-100,100,100)*scale
+forward_up_right = controller.set_wiimote_acceleration(0,100,100,100)*scale
+forward_down_left = controller.set_wiimote_acceleration(0,-100,-100,100)*scale
+forward_down_right = controller.set_wiimote_acceleration(0,100,-100,100)*scale
+backward_up_left = controller.set_wiimote_acceleration(0,-100,100,-100)*scale
+backward_up_right = controller.set_wiimote_acceleration(0,100,100,-100)*scale
+backward_down_left = controller.set_wiimote_acceleration(0,-100,-100,-100)*scale
+backward_down_right = controller.set_wiimote_acceleration(0,100,-100,-100)*scale
+
+#controls
+a_press = controller.set_wiimote_buttons(0, {"A": True})
+a_release = controller.set_wiimote_buttons(0, {"A": False})
+
+while True:
+    await event.frameadvance()
+    count+=1
+
+
+    if count%frames_per_action==0:
+
+        print(controller.get_wiimote_acceleration(0))
+    #controller.set_wiimote_acceleration(0, {})
+        controller.set_wiimote_buttons(0, {"A": True})
+    else:
+        controller.set_wiimote_buttons(0, {"A": False})

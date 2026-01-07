@@ -1,57 +1,114 @@
 from dolphin import event, gui, controller
 from typing import TypedDict
 import time
+import random
 count=0
 
 #actions
-scale = 0.8
-
 frames_per_action = 3
 
-idle = controller.set_wiimote_acceleration(0,0,0,0)*scale
+scale = 1          # scalar applied to all actions
+base = 100           # base accel magnitude before scaling
+MAX_ACCEL = 32767    # typical 16-bit safe clamp
 
-left = controller.set_wiimote_acceleration(0,-100,0,0)*scale
-right = controller.set_wiimote_acceleration(0,100,0,0)*scale
-up = controller.set_wiimote_acceleration(0,0,100,0)*scale
-down = controller.set_wiimote_acceleration(0,0,-100,0)*scale
-forward = controller.set_wiimote_acceleration(0,0,0,100)*scale
-backward = controller.set_wiimote_acceleration(0,0,0,-100)*scale
 
-up_left = controller.set_wiimote_acceleration(0,-100,100,0)*scale
-up_right = controller.set_wiimote_acceleration(0,100,100,0)*scale
-down_left = controller.set_wiimote_acceleration(0,-100,-100,0)*scale
-down_right = controller.set_wiimote_acceleration(0,100,-100,0)*scale
-forward_up = controller.set_wiimote_acceleration(0,0,100,100)*scale
-forward_down = controller.set_wiimote_acceleration(0,0,-100,100)*scale
-forward_left = controller.set_wiimote_acceleration(0,-100,0,100)*scale
-forward_right = controller.set_wiimote_acceleration(0,100,0,100)*scale
-backward_up = controller.set_wiimote_acceleration(0,0,100,-100)*scale
-backward_down = controller.set_wiimote_acceleration(0,0,-100,-100)*scale
-backward_left = controller.set_wiimote_acceleration(0,-100,0,-100)*scale
-backward_right = controller.set_wiimote_acceleration(0,100,0,-100)*scale
+def _clamp_int(x: float) -> int:
+    return int(max(-MAX_ACCEL, min(MAX_ACCEL, round(x))))
 
-forward_up_left = controller.set_wiimote_acceleration(0,-100,100,100)*scale
-forward_up_right = controller.set_wiimote_acceleration(0,100,100,100)*scale
-forward_down_left = controller.set_wiimote_acceleration(0,-100,-100,100)*scale
-forward_down_right = controller.set_wiimote_acceleration(0,100,-100,100)*scale
-backward_up_left = controller.set_wiimote_acceleration(0,-100,100,-100)*scale
-backward_up_right = controller.set_wiimote_acceleration(0,100,100,-100)*scale
-backward_down_left = controller.set_wiimote_acceleration(0,-100,-100,-100)*scale
-backward_down_right = controller.set_wiimote_acceleration(0,100,-100,-100)*scale
+def _v(v: float) -> int:
+    return _clamp_int(v * scale)
+
+def set_accel(controller_id:int,x: float, y: float, z: float):
+    controller.set_wiimote_acceleration(controller_id, _v(x), _v(y), _v(z))
+
+def idle():          set_accel(0, 0, 0, 0)
+
+def left():          set_accel(0, -base, 0, 0)
+def right():         set_accel(0,  base, 0, 0)
+def up():            set_accel(0, 0,  base, 0)
+def down():          set_accel(0, 0, -base, 0)
+def forward():       set_accel(0, 0, 0,  base)
+def backward():      set_accel(0, 0, 0, -base)
+
+def up_left():       set_accel(0, -base,  base, 0)
+def up_right():      set_accel(0,  base,  base, 0)
+def down_left():     set_accel(0, -base, -base, 0)
+def down_right():    set_accel(0,  base, -base, 0)
+
+def forward_up():    set_accel(0, 0,  base,  base)
+def forward_down():  set_accel(0, 0, -base,  base)
+def forward_left():  set_accel(0, -base, 0,  base)
+def forward_right(): set_accel(0,  base, 0,  base)
+
+def backward_up():   set_accel(0, 0,  base, -base)
+def backward_down(): set_accel(0, 0, -base, -base)
+def backward_left(): set_accel(0, -base, 0, -base)
+def backward_right():set_accel(0,  base, 0, -base)
+
+def forward_up_left():    set_accel(0, -base,  base,  base)
+def forward_up_right():   set_accel(0,  base,  base,  base)
+def forward_down_left():  set_accel(0, -base, -base,  base)
+def forward_down_right(): set_accel(0,  base, -base,  base)
+
+def backward_up_left():   set_accel(0, -base,  base, -base)
+def backward_up_right():  set_accel(0,  base,  base, -base)
+def backward_down_left(): set_accel(0, -base, -base, -base)
+def backward_down_right():set_accel(0,  base, -base, -base)
+
+ACTIONS = {
+    0: idle,
+
+    # single-axis (1D)
+    1: left,
+    2: right,
+    3: up,
+    4: down,
+    5: forward,
+    6: backward,
+
+    # two-axis (2D)
+    7: up_left,
+    8: up_right,
+    9: down_left,
+    10: down_right,
+
+    11: forward_up,
+    12: forward_down,
+    13: forward_left,
+    14: forward_right,
+
+    15: backward_up,
+    16: backward_down,
+    17: backward_left,
+    18: backward_right,
+
+    # three-axis (3D)
+    19: forward_up_left,
+    20: forward_up_right,
+    21: forward_down_left,
+    22: forward_down_right,
+
+    23: backward_up_left,
+    24: backward_up_right,
+    25: backward_down_left,
+    26: backward_down_right,
+}
 
 #controls
-a_press = controller.set_wiimote_buttons(0, {"A": True})
-a_release = controller.set_wiimote_buttons(0, {"A": False})
+def a_press():
+    controller.set_wiimote_buttons(0, {"A": True})
 
+def a_release():
+    controller.set_wiimote_buttons(0, {"A": False})
 while True:
     await event.frameadvance()
     count+=1
-
-
-    if count%frames_per_action==0:
-
+    idx = random.randint(0, 26)
+    ACTIONS[idx]()
+    if count%1000==0:
         print(controller.get_wiimote_acceleration(0))
-    #controller.set_wiimote_acceleration(0, {})
-        controller.set_wiimote_buttons(0, {"A": True})
-    else:
-        controller.set_wiimote_buttons(0, {"A": False})
+        print(random.randint(1, 10))
+
+        #controller.set_wiimote_buttons(0, {"A": True})
+    #else:
+        #controller.set_wiimote_buttons(0, {"A": False})

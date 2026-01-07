@@ -94,6 +94,15 @@ ACTIONS = {
     26: backward_down_right,
 }
 
+#from colour_grapping_2 import detect_point_events
+#
+#print("Starting runner...")
+#for ev in detect_point_events():
+#    print("Got event:", ev["label"], ev["dt"], ev["rgb"])
+
+
+
+
 #controls
 def a_press():
     controller.set_wiimote_buttons(0, {"A": True})

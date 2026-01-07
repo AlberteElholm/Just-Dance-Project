@@ -1,34 +1,110 @@
-import mss
 import time
+import mss
+from pynput import mouse
+m = mouse.Controller()
 
-# Pixel location (WE NEED TO FIND OUT THE PIXEL WE WANT!!!!)
-PIXEL_X = X
-PIXEL_Y = Y
+PIXEL_X = 280 #280 rasputin  
+PIXEL_Y = 446 #553  
 
-POLL_HZ = 60                 # how often we sample the pixel 
-COOLDOWN_MS = 150            # minimum time before new sample to ensure no double sampling 
+POLL_HZ = 248                 # how often we sample the pixel
+ARM_ON_UNKNOWN = False       # keep False to avoid noisy triggers
+DEBUG = False                 # set False when done
 
+# Beat-based re-arm settings
+BPM = 124                    # song tempo
+SPEED_MULTIPLIER = 10       # speed up (>1.0) or slow down (<1.0) the rearm timing
+COOLDOWN_MS = 500/SPEED_MULTIPLIER            # We primarily rely on re-arming (message disappears) rather than cooldown.
 
-with mss.mss() as sct:
-    monitor = {"top": PIXEL_Y, "left": PIXEL_X, "width": 1, "height": 1}
-    img = sct.grab(monitor)
+#Pixel reader
+sct = mss.mss()
+def read_rgb(x, y):
+    img = sct.grab({"top": y, "left": x, "width": 1, "height": 1})
+    r, g, b = img.pixel(0, 0)
+    return r, g, b
 
-    b, g, r, a = img.pixel(0, 0)
-
-    print(f"RGB = ({r}, {g}, {b})")     #WE PRINT HERE DURING DEBUGGING SO WE CAN SEE WHETHER IT WORKS, REMOVE LATER.
-
-
+#Pixel classifier
 def classify_pixel(r, g, b):
-    if r < 40 and g < 40 and b < 40:
+    if r < 45 and g < 50 and b < 50:
         return "None"
-    if r > 200 and g < 80 and b < 80:
+    if r > 120 and g < 60 and b < 60:
         return "X"          # red
     if r > 200 and g > 150 and b < 80:
         return "Yeah"       # gold/yellow
-    if g > 200 and r < 100:
-        return "Perfect"   # green
-    if b > 200 and r < 100:
-        return "Good"      # blue
+    if g > 170 and r > 100:
+        return "Perfect"    # green
+    if b > 200 and r < 20:
+        return "Good"       # blue
     if r > 120 and b > 120:
-        return "OK"        # purple
-    return "Unknown"
+        return "OK"         # purple
+    return "Unknown"    
+
+#for i in range (1000):
+#    print(m.position,read_rgb(m.position[0],m.position[1]),classify_pixel(read_rgb(m.position[0],m.position[1])[0],read_rgb(m.position[0],m.position[1])[1],read_rgb(m.position[0],m.position[1])[2]))
+#    time.sleep(0.3)
+# -----------------------
+# EVENT-DRIVEN DETECTOR
+# -----------------------
+def detect_point_events():
+    """
+    Generator that yields an event each time a new point message appears.
+
+    Event definition (rising edge):
+      None/Unknown -> (X/OK/Good/Perfect/Yeah)
+
+    Re-arming:
+      After firing, we won't fire again until we see label == "None"
+      (i.e., message disappeared).
+    """
+    dt = 1.0 / POLL_HZ #time step between samples
+
+    armed = True
+    last_event_time = 0.0
+    last_t = None
+
+    while True:
+        r, g, b = read_rgb(PIXEL_X, PIXEL_Y)
+        label = classify_pixel(r, g, b)
+
+        now = time.time()
+        cooldown_ok = (now - last_event_time) * 1000.0 >= COOLDOWN_MS
+
+        is_judgement = label in {"X", "OK", "Good", "Perfect", "Yeah"}
+        is_clear = (label == "None") or (ARM_ON_UNKNOWN and label == "Unknown")
+
+        # Re-arm when message is gone or after rearm_frames time has passed
+        rearm_threshold_ms = 1/((124/60)*SPEED_MULTIPLIER)
+        if is_clear: #or ((now - last_event_time)>= rearm_threshold_ms):
+            armed = True
+
+        # Fire event on first appearance
+        if armed and is_judgement and cooldown_ok:
+            event_dt = 0.0 if last_t is None else (now - last_t)
+            last_t = now
+            last_event_time = now
+            armed = False
+
+            yield {
+                "t": now,
+                "dt": event_dt,         # time since previous event
+                "label": label,
+                "rgb": (r, g, b),
+            }
+
+        if DEBUG:
+            # Useful during calibration. Turn off later.
+            print(f"RGB={r,g,b}  label={label}  armed={armed}")
+
+        time.sleep(dt)
+
+
+# -----------------------
+# DEMO / TEST RUN
+# -----------------------
+count=0
+
+if __name__ == "__main__":
+   print("Listening for new point-message events... (Ctrl+C to stop)")
+   for ev in detect_point_events():
+
+        print(f"EVENT: label={ev['label']} dt={ev['dt']:.3f}s rgb={ev['rgb']} count: {count}")
+        count+=1

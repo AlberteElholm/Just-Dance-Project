@@ -3,45 +3,30 @@ import mss
 from pynput import mouse
 m = mouse.Controller()
 
-# -----------------------
-# CONFIG (calibrate later)
-# -----------------------
-PIXEL_X = 280  # TODO: set this
-PIXEL_Y = 553  # TODO: set this
+PIXEL_X = 280  
+PIXEL_Y = 553  
 
 POLL_HZ = 248                 # how often we sample the pixel
 ARM_ON_UNKNOWN = False       # keep False to avoid noisy triggers
-DEBUG = False                 # set False later
+DEBUG = False                 # set False when done
 
-# Beat-based rearm settings
+# Beat-based re-arm settings
 BPM = 124                    # song tempo
 SPEED_MULTIPLIER = 2       # speed up (>1.0) or slow down (<1.0) the rearm timing
-# Because the point message stays ~1 second, we can use a long debounce.
+# Because the point message stays for 1 second, we can use a long debounce.
 # We primarily rely on re-arming (message disappears) rather than cooldown.
 COOLDOWN_MS = 100            # optional extra protection; tune 0–300ms if needed
 
-
-# -----------------------
-# BASIC PIXEL READ
-# -----------------------
-def read_rgb(x: int, y: int) -> tuple[int, int, int]:
+#Pixel reader
+def read_rgb(x, y):
     """Read one screen pixel and return (r, g, b). mss returns BGRA."""
     with mss.mss() as sct:
         img = sct.grab({"top": y, "left": x, "width": 1, "height": 1})
         r, g, b = img.pixel(0, 0)
         return r, g, b
 
-
-
-# -----------------------
-# CLASSIFICATION
-# -----------------------
-def classify_pixel(r: int, g: int, b: int) -> str:
-    # NOTE: These thresholds will require tuning for your setup.
-
-    # OPTIONAL: detect "None" (no message present).
-    # If the pixel is usually dark/background when there is no icon, this helps a lot.
-    # Tune these numbers after you calibrate.
+#Pixel classifier
+def classify_pixel(r, g, b):
     if r < 45 and g < 50 and b < 50:
         return "None"
     if r > 120 and g < 60 and b < 60:
@@ -54,7 +39,6 @@ def classify_pixel(r: int, g: int, b: int) -> str:
         return "Good"       # blue
     if r > 120 and b > 120:
         return "OK"         # purple
-
     return "Unknown"    
 
 #for i in range (1000):

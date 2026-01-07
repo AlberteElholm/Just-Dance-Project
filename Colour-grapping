@@ -101,32 +101,15 @@ def detect_point_events():
 # DEMO / TEST RUN
 # -----------------------
 count=0
-x_count = 0
-ok_count = 0
-good_count = 0
-perfect_count = 0
 
 if __name__ == "__main__":
    print("Listening for new point-message events... (Ctrl+C to stop)")
    for ev in detect_point_events():
 
-        total_score = x_count * 0 + ok_count * 0.3 + good_count * 0.5 + perfect_count * 1.0
-        print(f"EVENT: label={ev['label']} dt={ev['dt']:.3f}s rgb={ev['rgb']} count: {count} total score: {total_score}")
+        print(f"EVENT: label={ev['label']} dt={ev['dt']:.3f}s rgb={ev['rgb']} count: {count}")
         count+=1
 
-        r, g, b = read_rgb(PIXEL_X, PIXEL_Y)
-        label = classify_pixel(r, g, b)
-        if label == "X":
-            x_count += 1
 
-        if label == "OK":
-            ok_count += 1
-
-        if label == "Good":
-            good_count += 1
-
-        if label == "Perfect":
-            perfect_count +=1
         
         
 

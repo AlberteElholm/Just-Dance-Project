@@ -13,9 +13,7 @@ DEBUG = False                 # set False when done
 # Beat-based re-arm settings
 BPM = 124                    # song tempo
 SPEED_MULTIPLIER = 2       # speed up (>1.0) or slow down (<1.0) the rearm timing
-# Because the point message stays for 1 second, we can use a long debounce.
-# We primarily rely on re-arming (message disappears) rather than cooldown.
-COOLDOWN_MS = 100            # optional extra protection; tune 0–300ms if needed
+COOLDOWN_MS = 100            # We primarily rely on re-arming (message disappears) rather than cooldown.
 
 #Pixel reader
 sct = mss.mss()

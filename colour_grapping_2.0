@@ -1,0 +1,34 @@
+import mss
+import time
+
+# Pixel location (WE NEED TO FIND OUT THE PIXEL WE WANT!!!!)
+PIXEL_X = X
+PIXEL_Y = Y
+
+POLL_HZ = 60                 # how often we sample the pixel 
+COOLDOWN_MS = 150            # minimum time before new sample to ensure no double sampling 
+
+
+with mss.mss() as sct:
+    monitor = {"top": PIXEL_Y, "left": PIXEL_X, "width": 1, "height": 1}
+    img = sct.grab(monitor)
+
+    b, g, r, a = img.pixel(0, 0)
+
+    print(f"RGB = ({r}, {g}, {b})")     #WE PRINT HERE DURING DEBUGGING SO WE CAN SEE WHETHER IT WORKS, REMOVE LATER.
+
+
+def classify_pixel(r, g, b):
+    if r < 40 and g < 40 and b < 40:
+        return "None"
+    if r > 200 and g < 80 and b < 80:
+        return "X"          # red
+    if r > 200 and g > 150 and b < 80:
+        return "Yeah"       # gold/yellow
+    if g > 200 and r < 100:
+        return "Perfect"   # green
+    if b > 200 and r < 100:
+        return "Good"      # blue
+    if r > 120 and b > 120:
+        return "OK"        # purple
+    return "Unknown"

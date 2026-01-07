@@ -18,10 +18,9 @@ SPEED_MULTIPLIER = 2       # speed up (>1.0) or slow down (<1.0) the rearm timin
 COOLDOWN_MS = 100            # optional extra protection; tune 0–300ms if needed
 
 #Pixel reader
+sct = mss.mss()
 def read_rgb(x, y):
-    """Read one screen pixel and return (r, g, b). mss returns BGRA."""
-    with mss.mss() as sct:
-        img = sct.grab({"top": y, "left": x, "width": 1, "height": 1})
+    img = sct.grab({"top": y, "left": x, "width": 1, "height": 1})
         r, g, b = img.pixel(0, 0)
         return r, g, b
 

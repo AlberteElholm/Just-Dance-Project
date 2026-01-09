@@ -44,15 +44,13 @@ move_count = 0 # antal moves talt
 PIXEL_X = 280
 PIXEL_Y = 446
 
-sct = mss.mss()
-
 ARM_ON_UNKNOWN = False
 DEBUG = False
 
-BPM = 124
-POLL_HZ = 2*BPM
+#BPM = 124
+#POLL_HZ = 2*BPM
 SPEED_MULTIPLIER = 10
-COOLDOWN_MS = 500 / SPEED_MULTIPLIER
+cd_frames = 20
 
 phase = 0
 state = state_from_phase(phase)
@@ -67,7 +65,9 @@ ep_reward = 0.0
 reward_lock = threading.Lock()
 reward_acc = 0.0
 
-def add_reward(r: float):
+
+
+def add_reward(reward: float):
     global reward_acc
     with reward_lock:
         reward_acc += reward
@@ -84,14 +84,37 @@ def dolphin_conn_loop(conn):
     global eps, episode_count, move_count
     global phase, state, a, ep_reward
 
-    sct = mss.mss()
-
+    armed = True
+    frame = 0
+    moves = 0
     # start first action
     conn.send(("send", int(a)))
-
+    sct = mss.mss()
     while True:
         reply, payload = conn.recv()
-    
+        frame += 1
+        
+
+        r, g, b = read_rgb(PIXEL_X, PIXEL_Y)
+        label = classify_pixel(r, g, b)
+
+        cooldown_ok = frame >= cd_frames
+
+        is_judgement = label[0] in {"X", "OK", "Good", "Perfect", "Yeah"}
+        is_clear = (label[0] == "None") or (ARM_ON_UNKNOWN and label[0] == "Unknown")
+
+        if is_clear:
+            armed = True
+
+        # Fire event on first appearance
+        if armed and is_judgement and cooldown_ok:
+            moves += 1
+            event_dt = frame
+            frame = 0
+            armed = False
+            reward = label[1]
+            print(label,"frames:",event_dt,"moves:", move_count)
+            add_reward(float(label[1]))
 
         if reply == "CLOSED":
             
@@ -120,7 +143,7 @@ def dolphin_conn_loop(conn):
                 episode_count += 1
 
             # reward observed during the last action window
-            r = pop_reward()
+            reward = pop_reward()
             ep_reward += reward
             move_count += 1
 
@@ -149,7 +172,7 @@ def dolphin_conn_loop(conn):
             # send next action to slave
             conn.send(("send", int(a)))
 
-            print("ep", episode_count, "move", move_count, "R", ep_reward, "eps", eps, payload)
+            #print("ep", episode_count, "move", move_count, "R", ep_reward, "eps", eps, payload)
 
 
 PORT = 26330
@@ -174,11 +197,12 @@ msg = conn.recv()
 print("[Master] received handshake:", msg)
 
 if __name__ == "__main__":
+    dolphin_conn_loop(conn)
     # start Dolphin connection loop concurrently
-    t = threading.Thread(target=dolphin_conn_loop, args=(conn,), daemon=True)
-    t.start()
+#    t = threading.Thread(target=dolphin_conn_loop, args=(conn,), daemon=True)
+#    t.start()
 
-    print("Listening for new point-message events... (Ctrl+C to stop)")
-    for ev in detect_point_events():
-        label, reward = ev["label"]   # because label is ["Perfect", 1.0]
-        add_reward(float(reward))
+#    print("Listening for new point-message events... (Ctrl+C to stop)")
+#    for ev in detect_point_events():
+#        label, reward = ev["label"]   # because label is ["Perfect", 1.0]
+#        add_reward(float(reward))

@@ -9,7 +9,7 @@ conn.send("READY")
 count=0
 
 #actions
-frames_per_action = 50
+frames_per_action = 3
 
 scale = 1          # scalar applied to all actions
 base = 100           # base accel magnitude before scaling

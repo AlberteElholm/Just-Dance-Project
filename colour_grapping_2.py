@@ -71,8 +71,6 @@ def detect_point_events():
         is_judgement = label[0] in {"X", "OK", "Good", "Perfect", "Yeah"}
         is_clear = (label[0] == "None") or (ARM_ON_UNKNOWN and label[0] == "Unknown")
 
-        # Re-arm when message is gone or after rearm_frames time has passed
-        rearm_threshold_ms = 1/((124/60)*SPEED_MULTIPLIER)
         if is_clear: #or ((now - last_event_time)>= rearm_threshold_ms):
             armed = True
 

@@ -25,18 +25,18 @@ def read_rgb(x, y):
 #Pixel classifier
 def classify_pixel(r, g, b):
     if r < 45 and g < 50 and b < 50:
-        return "None"
+        return ["None",0]
     if r > 120 and g < 60 and b < 60:
-        return "X"          # red
+        return ["X",0]          # red
     if r > 200 and g > 150 and b < 80:
-        return "Yeah"       # gold/yellow
+        return ["Yeah",0]       # gold/yellow
     if g > 170 and r > 100:
-        return "Perfect"    # green
+        return ["Perfect",1.0]   # green
     if b > 200 and r < 20:
-        return "Good"       # blue
+        return ["Good",0.5]       # blue
     if r > 120 and b > 120:
-        return "OK"         # purple
-    return "Unknown"    
+        return ["OK",0.3]         # purple
+    return ["Unknown",0]    
 
 #for i in range (1000):
 #    print(m.position,read_rgb(m.position[0],m.position[1]),classify_pixel(read_rgb(m.position[0],m.position[1])[0],read_rgb(m.position[0],m.position[1])[1],read_rgb(m.position[0],m.position[1])[2]))
@@ -68,8 +68,8 @@ def detect_point_events():
         now = time.time()
         cooldown_ok = (now - last_event_time) * 1000.0 >= COOLDOWN_MS
 
-        is_judgement = label in {"X", "OK", "Good", "Perfect", "Yeah"}
-        is_clear = (label == "None") or (ARM_ON_UNKNOWN and label == "Unknown")
+        is_judgement = label[0] in {"X", "OK", "Good", "Perfect", "Yeah"}
+        is_clear = (label[0] == "None") or (ARM_ON_UNKNOWN and label[0] == "Unknown")
 
         # Re-arm when message is gone or after rearm_frames time has passed
         rearm_threshold_ms = 1/((124/60)*SPEED_MULTIPLIER)
@@ -105,6 +105,6 @@ count=0
 if __name__ == "__main__":
    print("Listening for new point-message events... (Ctrl+C to stop)")
    for ev in detect_point_events():
-
+        label, r = ev["label"]
         print(f"EVENT: label={ev['label']} dt={ev['dt']:.3f}s rgb={ev['rgb']} count: {count}")
         count+=1

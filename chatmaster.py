@@ -6,87 +6,149 @@ import time
 import mss
 from pynput import mouse
 import threading
+from collections import defaultdict
+import numpy as np
+from colour_grapping_2 import *
+from queue import Queue, Empty
+import pickle
+from pathlib import Path
+
 
 m = mouse.Controller()
 
-count = 0
+def default_value():
+    return np.zeros(27, dtype=np.float32)
+
+Q = defaultdict(default_value)
+E = defaultdict(default_value)  # eligibility traces
+
+alpha = 0.05
+gamma = 0.95
+lam = 0.90
+
+eps = 1.0
+eps_min = 0.05
+eps_decay = 0.995  # pr episode
+
+def epsilon_greedy(state):
+    if np.random.rand() < eps:
+        return np.random.randint(27)
+    return int(np.argmax(Q[state]))
+
+def state_from_phase(phase):
+    return phase  # state is just phase index
+
+episode_count = 0
+move_count = 0 # antal moves talt
 
 PIXEL_X = 280
 PIXEL_Y = 446
 
-POLL_HZ = 248
+sct = mss.mss()
+
 ARM_ON_UNKNOWN = False
 DEBUG = False
 
 BPM = 124
+POLL_HZ = 2*BPM
 SPEED_MULTIPLIER = 10
 COOLDOWN_MS = 500 / SPEED_MULTIPLIER
 
-sct = mss.mss()
+phase = 0
+state = state_from_phase(phase)
 
-def read_rgb(x, y):
-    img = sct.grab({"top": y, "left": x, "width": 1, "height": 1})
-    r, g, b = img.pixel(0, 0)
-    return r, g, b
+# clear traces at start of episode
+E.clear()
 
-def classify_pixel(r, g, b):
-    if r < 45 and g < 50 and b < 50:
-        return "None"
-    if r > 120 and g < 60 and b < 60:
-        return "X"
-    if r > 200 and g > 150 and b < 80:
-        return "Yeah"
-    if g > 170 and r > 100:
-        return "Perfect"
-    if b > 200 and r < 20:
-        return "Good"
-    if r > 120 and b > 120:
-        return "OK"
-    return "Unknown"
+a = epsilon_greedy(state)
 
-def detect_point_events():
-    dt = 1.0 / POLL_HZ
-    armed = True
-    last_event_time = 0.0
-    last_t = None
+ep_reward = 0.0
 
-    while True:
-        r, g, b = read_rgb(PIXEL_X, PIXEL_Y)
-        label = classify_pixel(r, g, b)
+reward_lock = threading.Lock()
+reward_acc = 0.0
 
-        now = time.time()
-        cooldown_ok = (now - last_event_time) * 1000.0 >= COOLDOWN_MS
+def add_reward(r: float):
+    global reward_acc
+    with reward_lock:
+        reward_acc += r
 
-        is_judgement = label in {"X", "OK", "Good", "Perfect", "Yeah"}
-        is_clear = (label == "None") or (ARM_ON_UNKNOWN and label == "Unknown")
-
-        if is_clear:
-            armed = True
-
-        if armed and is_judgement and cooldown_ok:
-            event_dt = 0.0 if last_t is None else (now - last_t)
-            last_t = now
-            last_event_time = now
-            armed = False
-
-            yield {"t": now, "dt": event_dt, "label": label, "rgb": (r, g, b)}
-
-        if DEBUG:
-            print(f"RGB={r,g,b}  label={label}  armed={armed}")
-
-        time.sleep(dt)
+def pop_reward() -> float:
+    global reward_acc
+    with reward_lock:
+        r = reward_acc
+        reward_acc = 0.0
+        return r
 
 # --- NEW: run conn loop in a thread ---
 def dolphin_conn_loop(conn):
-    # send an initial move (optional)
-    move = random.randint(0, 26)
-    conn.send(("send", move))
+    global eps, episode_count, move_count
+    global phase, state, a, ep_reward
+
+    # start first action
+    conn.send(("send", int(a)))
 
     while True:
         reply, payload = conn.recv()
+
+
         if reply == "CLOSED":
-            move = random.randint(0, 26)
-            conn.send(("send", move))
+            
+            if payload['B'] and not payload['A']: # manuel reset
+                
+                move_count = 0
+
+                phase = 0
+                state = state_from_phase(phase)
+
+                E.clear()
+                a = epsilon_greedy(state)
+
+                ep_reward = 0.0
+
+                # decay epsilon per episode (recommended)
+                eps = max(eps_min, eps * eps_decay)
+
+                # clear any leftover reward
+                _ = pop_reward()
+
+                conn.send(("send", int(a)))
+                continue
+            
+            if payload['B'] and payload['A']: #automatisk reset 
+                episode_count += 1
+
+            # reward observed during the last action window
+            r = pop_reward()
+            ep_reward += r
+            move_count += 1
+
+            # next state (your current design: phase increments)
+            phase += 1
+            s2 = state_from_phase(phase)
+
+            # choose next action
+            a2 = epsilon_greedy(s2)
+
+            # SARSA(λ) TD error
+            delta = r + gamma * Q[s2][a2] - Q[state][a]
+
+            # eligibility trace update (accumulating traces)
+            E[state][a] += 1.0
+
+            # update all traced pairs
+            for s_key in list(E.keys()):
+                Q[s_key] += alpha * delta * E[s_key]
+                E[s_key] *= gamma * lam
+                if np.max(np.abs(E[s_key])) < 1e-6:
+                    del E[s_key]
+
+            state, a = s2, a2
+
+            # send next action to slave
+            conn.send(("send", int(a)))
+
+            print("ep", episode_count, "move", move_count, "R", ep_reward, "eps", eps, payload)
+
 
 PORT = 26330
 AUTHKEY = b"secret password"
@@ -97,14 +159,7 @@ SCRIPT_PATH = r"C:/Users/esben/OneDrive/Documents/GitHub/Just-Dance-Project/slav
 listener = Listener(("localhost", PORT), authkey=AUTHKEY)
 
 sysname = platform.system()
-if sysname == "Windows":
-    cmd = [DOLPHIN_EXE, "--no-python-subinterpreters", "--script", SCRIPT_PATH, "-b", "--exec", ISO_PATH]
-elif sysname == "Linux":
-    cmd = [DOLPHIN_EXE, "--no-python-subinterpreters", "--script", SCRIPT_PATH, "-b", f"--exec={ISO_PATH}"]
-elif sysname == "Darwin":
-    cmd = ["open", DOLPHIN_EXE, "--args", "--no-python-subinterpreters", "--script", SCRIPT_PATH, "-b", f"--exec={ISO_PATH}"]
-else:
-    raise RuntimeError("Unsupported OS")
+cmd = [DOLPHIN_EXE, "--no-python-subinterpreters", "--script", SCRIPT_PATH, "-b", "--exec", ISO_PATH]
 
 print("[Master] launching:", cmd)
 proc = subprocess.Popen(cmd)
@@ -123,5 +178,5 @@ if __name__ == "__main__":
 
     print("Listening for new point-message events... (Ctrl+C to stop)")
     for ev in detect_point_events():
-        print(f"EVENT: label={ev['label']} dt={ev['dt']:.3f}s rgb={ev['rgb']} count: {count}")
-        count += 1
+        label, r = ev["label"]   # because label is ["Perfect", 1.0]
+        add_reward(float(r))

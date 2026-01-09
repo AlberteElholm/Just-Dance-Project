@@ -103,17 +103,20 @@ def a_press():
 
 def a_release():
     controller.set_wiimote_buttons(0, {"A": False})
+
+def b_press():
+    controller.set_wiimote_buttons(0, {"B": True})
+
+def b_release():
+    controller.set_wiimote_buttons(0, {"B": False})
+
 while True:
     cmd, payload = conn.recv()
-
-    if cmd == "PING":
-        conn.send(("PONG", payload))
-        continue
 
     if cmd == "send":
         if payload in ACTIONS:
             for i in range(frames_per_action):
                 await event.frameadvance()
                 ACTIONS[payload]()
-            conn.send(("CLOSED",payload))
+            conn.send(("CLOSED",controller.get_wiimote_buttons(0)))
             continue

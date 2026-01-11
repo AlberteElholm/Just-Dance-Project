@@ -110,13 +110,41 @@ def b_press():
 def b_release():
     controller.set_wiimote_buttons(0, {"B": False})
 
+
+startup = 0
+
 while True:
     cmd, payload = conn.recv()
 
     if cmd == "send":
+        if controller.get_wiimote_buttons(0)['B'] and startup < 1:
+            a_press()
+            b_press()
+            startup += 1
+            await event.frameadvance()
+            conn.send(("CLOSED",controller.get_wiimote_buttons(0)))
+            a_release()
+            b_release()
+
         if payload in ACTIONS:
             for i in range(frames_per_action):
                 await event.frameadvance()
                 ACTIONS[payload]()
             conn.send(("CLOSED",controller.get_wiimote_buttons(0)))
             continue
+    
+    if cmd == "reset":
+        for i in range(400):
+            await event.frameadvance()
+        for i in range(3):
+            a_press()
+            for j in range(200):
+                await event.frameadvance()
+                a_release()
+                controller.set_wiimote_pointer(0,-0.7, -0.9)
+        await event.frameadvance()
+        a_press()
+        b_press()
+        conn.send(("CLOSED",controller.get_wiimote_buttons(0)))
+        a_release()
+        b_release()

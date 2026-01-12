@@ -93,57 +93,36 @@ def dolphin_conn_loop(conn):
     sct = mss.mss()
     while True:
         reply, payload = conn.recv()
-        frame += 1
-        total_frames += 1
-        r, g, b = read_rgb(PIXEL_X, PIXEL_Y)
-        label = classify_pixel(r, g, b)
+        if ready:
+            frame += 1
+            total_frames += 1
+            r, g, b = read_rgb(PIXEL_X, PIXEL_Y)
+            label = classify_pixel(r, g, b)
 
-        cooldown_ok = frame >= cd_frames
+            cooldown_ok = frame >= cd_frames
 
-        is_judgement = label[0] in {"X", "OK", "Good", "Perfect", "Yeah"}
+            is_judgement = label[0] in {"X", "OK", "Good", "Perfect", "Yeah"}
 
-        label_changed = prev_label != label[0]
+            label_changed = prev_label != label[0]
 
-        is_clear = (label[0] == "None") or (ARM_ON_UNKNOWN and label[0] == "Unknown") or label_changed
+            is_clear = (label[0] == "None") or (ARM_ON_UNKNOWN and label[0] == "Unknown") or label_changed
 
-        prev_label = label[0]
-        if is_clear:
-            armed = True
+            prev_label = label[0]
+            if is_clear:
+                armed = True
 
-        # Fire event on first appearance
-        if armed and is_judgement and cooldown_ok:
-            moves += 1
-            event_dt = frame
-            frame = 0
-            armed = False
-            reward = label[1]
-            print("rgb:",r,g,b,label,"frames:",event_dt,"moves:", moves, "total_frames:",total_frames)
-            add_reward(float(label[1]))
+            # Fire event on first appearance
+            if armed and is_judgement and cooldown_ok:
+                moves += 1
+                event_dt = frame
+                frame = 0
+                armed = False
+                reward = label[1]
+                print("rgb:",r,g,b,label,"frames:",event_dt,"moves:", moves, "total_frames:",total_frames)
+                add_reward(float(label[1]))
 
         if reply == "CLOSED" and moves < song_moves and (total_frames<2000 or ready == False):
 
-            """
-            if payload['B'] and not payload['A']: # manuel reset
-                
-                move_count = 0
-                moves = 0
-                phase = 0
-                state = state_from_phase(phase)
-
-                E.clear()
-                a = epsilon_greedy(state)
-
-                ep_reward = 0.0
-
-                # decay epsilon per episode (recommended)
-                eps = max(eps_min, eps * eps_decay)
-
-                # clear any leftover reward
-                _ = pop_reward()
-
-                conn.send(("send", int(a)))
-                continue
-            """
             if payload['B'] and payload['A']: #automatisk reset 
                 episode_count += 1
                 print("episode:",episode_count)
@@ -179,7 +158,7 @@ def dolphin_conn_loop(conn):
             a2 = epsilon_greedy(s2)
 
             # SARSA(λ) TD error
-            delta = r + gamma * Q[s2][a2] - Q[state][a]
+            delta = reward + gamma * Q[s2][a2] - Q[state][a]
 
             # eligibility trace update (accumulating traces)
             E[state][a] += 1.0
@@ -208,6 +187,7 @@ def dolphin_conn_loop(conn):
         else:
             if ready:
                 conn.send(("reset", ":)"))
+                ready = False
                 moves = 0
                 total_frames = 0
                 print("reset",reply,payload)

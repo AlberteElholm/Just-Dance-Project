@@ -134,17 +134,21 @@ while True:
             continue
     
     if cmd == "reset":
-        for i in range(400):
+        for i in range(600):
             await event.frameadvance()
         for i in range(3):
-            a_press()
-            for j in range(200):
+            conn.send(("print","a_press"))
+            a_release()
+            for j in range(250):
                 await event.frameadvance()
-                a_release()
                 controller.set_wiimote_pointer(0,-0.7, -0.9)
-        await event.frameadvance()
+            a_press()
+            await event.frameadvance()
+        
         a_press()
         b_press()
+        await event.frameadvance()
+        conn.send(("print",controller.get_wiimote_buttons(0)))
         conn.send(("CLOSED",controller.get_wiimote_buttons(0)))
-        a_release()
-        b_release()
+        #a_release()
+        #b_release()

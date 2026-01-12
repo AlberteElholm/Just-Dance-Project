@@ -50,7 +50,7 @@ DEBUG = False
 #BPM = 124
 #POLL_HZ = 2*BPM
 SPEED_MULTIPLIER = 10
-cd_frames = 12
+cd_frames = 10
 song_moves = 233
 
 phase = 0

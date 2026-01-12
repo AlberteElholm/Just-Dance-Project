@@ -32,7 +32,7 @@ def classify_pixel(r, g, b):
         return ["Yeah",0]       # gold/yellow
     if g > 170 and r > 100:
         return ["Perfect",1.0]   # green
-    if b > 200 and r < 50:
+    if b > 200 and r < 20 and g > 150:
         return ["Good",0.5]       # blue
     if r > 120 and b > 120:
         return ["OK",0.3]         # purple

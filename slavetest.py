@@ -110,9 +110,20 @@ def b_press():
 def b_release():
     controller.set_wiimote_buttons(0, {"B": False})
 
+#def a_tap(frames=2):
+#    a_release()
+#    # give the game at least one frame to see A up
+#    for _ in range(1):
+#        await event.frameadvance()
+#    a_press()
+#    for _ in range(frames):
+#        await event.frameadvance()
+#    a_release()
+#    await event.frameadvance()
+
 
 startup = 0
-
+episode_count = 0
 while True:
     cmd, payload = conn.recv()
 
@@ -136,18 +147,45 @@ while True:
     if cmd == "reset":
         for i in range(600):
             await event.frameadvance()
-        for i in range(3):
-            conn.send(("print","a_press"))
-            a_release()
-            for j in range(250):
+        if episode_count < 2:
+            episode_count += 1
+            for i in range(2):
+                conn.send(("print","a_press"))
+                for j in range(400): 
+                    await event.frameadvance()
+                    controller.set_wiimote_pointer(0,-0.7,-0.9)  
+                a_release()
+                controller.set_wiimote_pointer(0,-0.7,-0.9) 
+                # give the game at least one frame to see A up
                 await event.frameadvance()
-                controller.set_wiimote_pointer(0,-0.7, -0.9)
-            a_press()
+                for _ in range(2):
+                    controller.set_wiimote_pointer(0,-0.7,-0.9) 
+                    a_press()
+                    await event.frameadvance()
+                a_release()
+                await event.frameadvance()
+        else:
+            conn.send(("print","a_press")) 
+            for j in range(400): 
+                await event.frameadvance()
+                controller.set_wiimote_pointer(0,-0.7,-0.9)  
+            a_release()
+            controller.set_wiimote_pointer(0,-0.7,-0.9) 
+                # give the game at least one frame to see A up
             await event.frameadvance()
-        
+            for _ in range(2):
+                controller.set_wiimote_pointer(0,-0.7,-0.9) 
+                a_press()
+                await event.frameadvance()
+            a_release()
+            await event.frameadvance()
+        for j in range(400): 
+            await event.frameadvance()
         a_press()
         b_press()
         await event.frameadvance()
+        a_press()
+        b_press()
         conn.send(("print",controller.get_wiimote_buttons(0)))
         conn.send(("CLOSED",controller.get_wiimote_buttons(0)))
         #a_release()

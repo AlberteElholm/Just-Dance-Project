@@ -41,17 +41,14 @@ def state_from_phase(phase):
 episode_count = 0
 move_count = 0 # antal moves talt
 
-PIXEL_X = 280
-PIXEL_Y = 446
+PIXEL_X = 287 #280 rasputin  
+PIXEL_Y = 422 #553  
 
 ARM_ON_UNKNOWN = False
 DEBUG = False
 
-#BPM = 124
-#POLL_HZ = 2*BPM
-SPEED_MULTIPLIER = 10
 cd_frames = 10
-song_moves = 233
+song_moves = 97 #233
 
 phase = 0
 state = state_from_phase(phase)
@@ -88,21 +85,28 @@ def dolphin_conn_loop(conn):
     armed = True
     frame = 0
     moves = 0
+    total_frames = 0
+    prev_label = 0
+    ready = False
     # start first action
     conn.send(("send", int(a)))
     sct = mss.mss()
     while True:
         reply, payload = conn.recv()
         frame += 1
-    
+        total_frames += 1
         r, g, b = read_rgb(PIXEL_X, PIXEL_Y)
         label = classify_pixel(r, g, b)
 
         cooldown_ok = frame >= cd_frames
 
         is_judgement = label[0] in {"X", "OK", "Good", "Perfect", "Yeah"}
-        is_clear = (label[0] == "None") or (ARM_ON_UNKNOWN and label[0] == "Unknown")
 
+        label_changed = prev_label != label[0]
+
+        is_clear = (label[0] == "None") or (ARM_ON_UNKNOWN and label[0] == "Unknown") or label_changed
+
+        prev_label = label[0]
         if is_clear:
             armed = True
 
@@ -113,10 +117,10 @@ def dolphin_conn_loop(conn):
             frame = 0
             armed = False
             reward = label[1]
-            print(label,"frames:",event_dt,"moves:", moves)
+            print("rgb:",r,g,b,label,"frames:",event_dt,"moves:", moves, "total_frames:",total_frames)
             add_reward(float(label[1]))
 
-        if reply == "CLOSED" and moves < song_moves:
+        if reply == "CLOSED" and moves < song_moves and (total_frames<2000 or ready == False):
 
             """
             if payload['B'] and not payload['A']: # manuel reset
@@ -146,6 +150,8 @@ def dolphin_conn_loop(conn):
                 move_count = 0
                 moves = 0
                 phase = 0
+                total_frames = 0
+                ready = True
                 state = state_from_phase(phase)
 
                 E.clear()
@@ -158,6 +164,7 @@ def dolphin_conn_loop(conn):
 
                 # clear any leftover reward
                 _ = pop_reward()
+                
 
             # reward observed during the last action window
             reward = pop_reward()
@@ -199,9 +206,11 @@ def dolphin_conn_loop(conn):
             print(payload)
 
         else:
-            conn.send(("reset", ":)"))
-            moves = 0
-            print("reset",reply,payload)
+            if ready:
+                conn.send(("reset", ":)"))
+                moves = 0
+                total_frames = 0
+                print("reset",reply,payload)
 
 
 PORT = 26330

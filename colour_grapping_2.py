@@ -3,8 +3,8 @@ import mss
 from pynput import mouse
 m = mouse.Controller()
 
-PIXEL_X = 280 #280 rasputin  
-PIXEL_Y = 446 #553  
+PIXEL_X = 287 #280 rasputin  
+PIXEL_Y = 422 #553  
 
 POLL_HZ = 248                 # how often we sample the pixel
 ARM_ON_UNKNOWN = False       # keep False to avoid noisy triggers
@@ -32,7 +32,7 @@ def classify_pixel(r, g, b):
         return ["Yeah",0]       # gold/yellow
     if g > 170 and r > 100:
         return ["Perfect",1.0]   # green
-    if b > 200 and r < 20 and g > 150:
+    if b > 200 and r < 20:
         return ["Good",0.5]       # blue
     if r > 120 and b > 120:
         return ["OK",0.3]         # purple

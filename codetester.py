@@ -1,26 +1,21 @@
 import subprocess
 import platform
 from multiprocessing.connection import Listener
-import random
-import time
 import mss
-from pynput import mouse
-import threading
 from collections import defaultdict
 import numpy as np
-from colour_grapping_2 import *
-from queue import Queue, Empty
+from colour_grapping_2 import read_rgb, classify_pixel
 import pickle
 from pathlib import Path
 
-
-m = mouse.Controller()
 
 def default_value():
     return np.zeros(27, dtype=np.float32)
 
 Q = defaultdict(default_value)
 E = defaultdict(default_value)  # eligibility traces
+
+
 
 alpha = 0.05
 gamma = 0.95
@@ -60,22 +55,57 @@ a = epsilon_greedy(state)
 
 ep_reward = 0.0
 
-reward_lock = threading.Lock()
+#reward_lock = threading.Lock()
 reward_acc = 0.0
 
-
+def q_stats(Q):
+    if len(Q) == 0:
+        return "Q is empty"
+    arr = np.stack([Q[s] for s in Q.keys()], axis=0)  # (num_states, 27)
+    return {
+        "num_states": arr.shape[0],
+        "min": float(arr.min()),
+        "max": float(arr.max()),
+        "mean": float(arr.mean()),
+        "abs_mean": float(np.abs(arr).mean()),
+    }
 
 def add_reward(reward: float):
     global reward_acc
-    with reward_lock:
-        reward_acc += reward
+    #with reward_lock:
+    reward_acc += reward
 
 def pop_reward() -> float:
     global reward_acc
-    with reward_lock:
-        reward = reward_acc
-        reward_acc = 0.0
-        return reward
+    #with reward_lock:
+    reward = reward_acc
+    reward_acc = 0.0
+    return reward
+
+def save_agent(path="agent.pkl"):
+    data = {
+        "Q": dict(Q),            # convert defaultdict -> normal dict
+        "eps": eps,
+        "episode_count": episode_count,
+    }
+    with open(path, "wb") as f:
+        pickle.dump(data, f)
+
+def load_agent(path="agent.pkl"):
+    global eps, episode_count
+    with open(path, "rb") as f:
+        data = pickle.load(f)
+    Q.clear()
+    for k, v in data["Q"].items():
+        Q[k] = v
+    eps = data.get("eps", eps)
+    episode_count = data.get("episode_count", episode_count)
+
+try:
+    load_agent()
+    print("[Master] Agent loaded")
+except FileNotFoundError:
+    print("[Master] No saved agent found, starting fresh")
 
 # --- NEW: run conn loop in a thread ---
 def dolphin_conn_loop(conn):
@@ -93,6 +123,7 @@ def dolphin_conn_loop(conn):
     sct = mss.mss()
     while True:
         reply, payload = conn.recv()
+        
         if ready:
             frame += 1
             total_frames += 1
@@ -124,7 +155,7 @@ def dolphin_conn_loop(conn):
         if reply == "CLOSED" and moves < song_moves and (total_frames<2000 or ready == False):
 
             if payload['B'] and payload['A']: #automatisk reset 
-                episode_count += 1
+
                 print("episode:",episode_count)
                 move_count = 0
                 moves = 0
@@ -143,7 +174,8 @@ def dolphin_conn_loop(conn):
 
                 # clear any leftover reward
                 _ = pop_reward()
-                
+                if episode_count % 5 == 0 and move_count == 0:
+                    print("Q stats:", q_stats(Q), "eps:", eps)
 
             # reward observed during the last action window
             reward = pop_reward()
@@ -187,6 +219,9 @@ def dolphin_conn_loop(conn):
         else:
             if ready:
                 conn.send(("reset", ":)"))
+                if moves == song_moves:
+                    save_agent()
+                    episode_count += 1
                 ready = False
                 moves = 0
                 total_frames = 0
@@ -205,7 +240,7 @@ sysname = platform.system()
 cmd = [DOLPHIN_EXE, "--no-python-subinterpreters", "--script", SCRIPT_PATH, "-b", "--exec", ISO_PATH]
 
 print("[Master] launching:", cmd)
-proc = subprocess.Popen(cmd)
+Opens_dolphin = subprocess.Popen(cmd)
 
 print("[Master] waiting for slave connect...")
 conn = listener.accept()
@@ -216,11 +251,3 @@ print("[Master] received handshake:", msg)
 
 if __name__ == "__main__":
     dolphin_conn_loop(conn)
-    # start Dolphin connection loop concurrently
-#    t = threading.Thread(target=dolphin_conn_loop, args=(conn,), daemon=True)
-#    t.start()
-
-#    print("Listening for new point-message events... (Ctrl+C to stop)")
-#    for ev in detect_point_events():
-#        label, reward = ev["label"]   # because label is ["Perfect", 1.0]
-#        add_reward(float(reward))

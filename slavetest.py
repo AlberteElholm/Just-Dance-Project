@@ -6,13 +6,9 @@ AUTHKEY = b"secret password"
 conn = Client(("localhost", PORT), authkey=AUTHKEY)
 conn.send("READY")
 
-count=0
-
-#actions
 frames_per_action = 3
 
-base = 100           # base accel magnitude before scaling
-
+base = 140  # base acceleration
 
 def set_accel(controller_id:int,x: float, y: float, z: float):
     controller.set_wiimote_acceleration(controller_id, x, y, z)
@@ -54,40 +50,19 @@ def backward_down_right():set_accel(0,  base, -base, -base)
 ACTIONS = {
     0: idle,
 
-    # single-axis (1D)
-    1: left,
-    2: right,
-    3: up,
-    4: down,
-    5: forward,
-    6: backward,
+    # 1D
+    1: left,  2: right,  3: up,    4: down,  5: forward,  6: backward,
 
-    # two-axis (2D)
-    7: up_left,
-    8: up_right,
-    9: down_left,
-    10: down_right,
+    # 2D
+    7: up_left,    8: up_right,    9: down_left,    10: down_right,
+    11: forward_up, 12: forward_down, 13: forward_left, 14: forward_right,
+    15: backward_up, 16: backward_down, 17: backward_left, 18: backward_right,
 
-    11: forward_up,
-    12: forward_down,
-    13: forward_left,
-    14: forward_right,
-
-    15: backward_up,
-    16: backward_down,
-    17: backward_left,
-    18: backward_right,
-
-    # three-axis (3D)
-    19: forward_up_left,
-    20: forward_up_right,
-    21: forward_down_left,
-    22: forward_down_right,
-
-    23: backward_up_left,
-    24: backward_up_right,
-    25: backward_down_left,
-    26: backward_down_right,
+    # 3D
+    19: forward_up_left,   20: forward_up_right,
+    21: forward_down_left, 22: forward_down_right,
+    23: backward_up_left,  24: backward_up_right,
+    25: backward_down_left,26: backward_down_right,
 }
 
 def a_press():
@@ -102,18 +77,45 @@ def b_press():
 def b_release():
     controller.set_wiimote_buttons(0, {"B": False})
 
-startup = False
+async def wait_frames(n: int):
+    for _ in range(n):
+        await event.frameadvance()
+
+def set_pointer():
+    controller.set_wiimote_pointer(0,-0.7,-0.9)
+
+async def a_sequence(hold_frames: int, repeats: int):
+
+    for _ in range(repeats):
+        # keep pointer steady while waiting
+        for _ in range(hold_frames):
+            await event.frameadvance()
+            set_pointer()
+
+        # two quick A taps with pointer set
+        for _ in range(2):
+            set_pointer()
+            a_press()
+            await event.frameadvance()
+
+        a_release()
+        await event.frameadvance()
+
+
+startup = 0
+
 episode_count = 0
+
 while True:
     cmd, payload = conn.recv()
 
     if cmd == "send":
-        if controller.get_wiimote_buttons(0)['B'] and startup == False:
+        if controller.get_wiimote_buttons(0)['B'] and startup < 1:
             a_press()
             b_press()
-            startup = True
+            startup += 1
             await event.frameadvance()
-            conn.send(("CLOSED",controller.get_wiimote_buttons(0)))
+            conn.send(("Dancing",controller.get_wiimote_buttons(0)))
             a_release()
             b_release()
 
@@ -121,50 +123,21 @@ while True:
             for i in range(frames_per_action):
                 await event.frameadvance()
                 ACTIONS[payload]()
-            conn.send(("CLOSED",controller.get_wiimote_buttons(0)))
+            conn.send(("Dancing",controller.get_wiimote_buttons(0)))
             continue
     
     if cmd == "reset":
-        for i in range(600):
-            await event.frameadvance()
+        await wait_frames(600)
+
         if episode_count < 2:
             episode_count += 1
-            for i in range(2):
-                conn.send(("print","a_press"))
-                for j in range(200): 
-                    await event.frameadvance()
-                    controller.set_wiimote_pointer(0,-0.7,-0.9)  
-                a_release()
-                controller.set_wiimote_pointer(0,-0.7,-0.9) 
-                # give the game at least one frame to see A up
-                await event.frameadvance()
-                for _ in range(2):
-                    controller.set_wiimote_pointer(0,-0.7,-0.9) 
-                    a_press()
-                    await event.frameadvance()
-                a_release()
-                await event.frameadvance()
+            await a_sequence(hold_frames=200, repeats=2)
         else:
-            conn.send(("print","a_press")) 
-            for j in range(20): 
-                await event.frameadvance()
-                controller.set_wiimote_pointer(0,-0.7,-0.9)  
-            a_release()
-            controller.set_wiimote_pointer(0,-0.7,-0.9) 
-                # give the game at least one frame to see A up
-            await event.frameadvance()
-            for _ in range(2):
-                controller.set_wiimote_pointer(0,-0.7,-0.9) 
-                a_press()
-                await event.frameadvance()
-            a_release()
-            await event.frameadvance()
-        for j in range(100): 
-            await event.frameadvance()
-        a_press()
-        b_press()
+            await a_sequence(hold_frames=20, repeats=1)
+
+        await wait_frames(100)
+
+        a_press(); b_press()
         await event.frameadvance()
-        a_press()
-        b_press()
-        conn.send(("print",controller.get_wiimote_buttons(0)))
-        conn.send(("CLOSED",controller.get_wiimote_buttons(0)))
+        a_press(); b_press()
+        conn.send(("Dancing", controller.get_wiimote_buttons(0)))

@@ -1,12 +1,14 @@
 import subprocess
-import platform
 from multiprocessing.connection import Listener
-import mss
 from collections import defaultdict
 import numpy as np
-from colour_grapping_2 import read_rgb, classify_pixel
+from colour_grapping_2 import read_rgb, classify_pixel, reward_detector,reset_reward_state
 import pickle
-from pathlib import Path
+
+# Change these paths to your own felk-dolphin version, your just dance 2 game and our slave-script
+Felk_dolphin_exe = r"C:/Users/esben/Downloads/dolphin-scripting-preview4-x64/dolphin"
+Game_path    = r"C:/Users/esben/Downloads/dolphin-2512-x64/Dolphin-x64/spil/Just_dance2.wbfs"
+Slave_path = r"C:/Users/esben/OneDrive/Documents/GitHub/Just-Dance-Project/slavetest.py"
 
 
 def default_value():
@@ -14,8 +16,6 @@ def default_value():
 
 Q = defaultdict(default_value)
 E = defaultdict(default_value)  # eligibility traces
-
-
 
 alpha = 0.05
 gamma = 0.95
@@ -34,16 +34,8 @@ def state_from_phase(phase):
     return phase  # state is just phase index
 
 episode_count = 0
-move_count = 0 # antal moves talt
 
-PIXEL_X = 287 #280 rasputin  
-PIXEL_Y = 422 #553  
-
-ARM_ON_UNKNOWN = False
-DEBUG = False
-
-cd_frames = 10
-song_moves = 97 #233
+song_moves = 97 #233 for the long version
 
 phase = 0
 state = state_from_phase(phase)
@@ -109,55 +101,29 @@ except FileNotFoundError:
 
 # --- NEW: run conn loop in a thread ---
 def dolphin_conn_loop(conn):
-    global eps, episode_count, move_count
+    global eps, episode_count
     global phase, state, a, ep_reward
 
-    armed = True
-    frame = 0
+
     moves = 0
     total_frames = 0
-    prev_label = 0
     ready = False
+
     # start first action
     conn.send(("send", int(a)))
-    sct = mss.mss()
     while True:
         reply, payload = conn.recv()
         
         if ready:
-            frame += 1
-            total_frames += 1
-            r, g, b = read_rgb(PIXEL_X, PIXEL_Y)
-            label = classify_pixel(r, g, b)
+            reward,moves,total_frames = reward_detector()
+            if reward is not None:
+                add_reward(reward)
 
-            cooldown_ok = frame >= cd_frames
-
-            is_judgement = label[0] in {"X", "OK", "Good", "Perfect", "Yeah"}
-
-            label_changed = prev_label != label[0]
-
-            is_clear = (label[0] == "None") or (ARM_ON_UNKNOWN and label[0] == "Unknown") or label_changed
-
-            prev_label = label[0]
-            if is_clear:
-                armed = True
-
-            # Fire event on first appearance
-            if armed and is_judgement and cooldown_ok:
-                moves += 1
-                event_dt = frame
-                frame = 0
-                armed = False
-                reward = label[1]
-                print("rgb:",r,g,b,label,"frames:",event_dt,"moves:", moves, "total_frames:",total_frames)
-                add_reward(float(label[1]))
-
-        if reply == "CLOSED" and moves < song_moves and (total_frames<2000 or ready == False):
+        if reply == "Dancing" and moves < song_moves and (total_frames<2000 or ready == False):
 
             if payload['B'] and payload['A']: #automatisk reset 
 
                 print("episode:",episode_count)
-                move_count = 0
                 moves = 0
                 phase = 0
                 total_frames = 0
@@ -174,13 +140,12 @@ def dolphin_conn_loop(conn):
 
                 # clear any leftover reward
                 _ = pop_reward()
-                if episode_count % 5 == 0 and move_count == 0:
+                if episode_count % 5 == 0 and moves == 0:
                     print("Q stats:", q_stats(Q), "eps:", eps)
 
             # reward observed during the last action window
             reward = pop_reward()
             ep_reward += reward
-            move_count += 1
 
             # next state (your current design: phase increments)
             phase += 1
@@ -207,7 +172,7 @@ def dolphin_conn_loop(conn):
             # send next action to slave
             conn.send(("send", int(a)))
 
-            #print("ep", episode_count, "move", move_count, "R", ep_reward, "eps", eps, payload)
+            #print("ep", episode_count, "move", moves, "R", ep_reward, "eps", eps, payload)
         elif reply == "waiting":
             conn.send(("filler", ":)"))
             print(payload)
@@ -222,22 +187,20 @@ def dolphin_conn_loop(conn):
                 if moves == song_moves:
                     save_agent()
                     episode_count += 1
+                reset_reward_state()
                 ready = False
                 moves = 0
                 total_frames = 0
-                print("reset",reply,payload)
+                print("reset")
 
 
 PORT = 26330
 AUTHKEY = b"secret password"
-DOLPHIN_EXE = r"C:/Users/esben/Downloads/dolphin-scripting-preview4-x64/dolphin"
-ISO_PATH    = r"C:/Users/esben/Downloads/dolphin-2512-x64/Dolphin-x64/spil/Just_dance2.wbfs"
-SCRIPT_PATH = r"C:/Users/esben/OneDrive/Documents/GitHub/Just-Dance-Project/slavetest.py"
 
 listener = Listener(("localhost", PORT), authkey=AUTHKEY)
 
-sysname = platform.system()
-cmd = [DOLPHIN_EXE, "--no-python-subinterpreters", "--script", SCRIPT_PATH, "-b", "--exec", ISO_PATH]
+
+cmd = [Felk_dolphin_exe, "--no-python-subinterpreters", "--script", Slave_path, "-b", "--exec", Game_path]
 
 print("[Master] launching:", cmd)
 Opens_dolphin = subprocess.Popen(cmd)

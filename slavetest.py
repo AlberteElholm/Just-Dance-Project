@@ -6,9 +6,9 @@ AUTHKEY = b"secret password"
 conn = Client(("localhost", PORT), authkey=AUTHKEY)
 conn.send("READY")
 
-frames_per_action = 3
+frames_per_action = 4
 
-base = 140  # base acceleration
+base = 100  # base acceleration
 
 def set_accel(controller_id:int,x: float, y: float, z: float):
     controller.set_wiimote_acceleration(controller_id, x, y, z)
@@ -59,10 +59,10 @@ ACTIONS = {
     15: backward_up, 16: backward_down, 17: backward_left, 18: backward_right,
 
     # 3D
-    19: forward_up_left,   20: forward_up_right,
-    21: forward_down_left, 22: forward_down_right,
-    23: backward_up_left,  24: backward_up_right,
-    25: backward_down_left,26: backward_down_right,
+    #19: forward_up_left,   20: forward_up_right,
+    #21: forward_down_left, 22: forward_down_right,
+    #23: backward_up_left,  24: backward_up_right,
+    #25: backward_down_left,26: backward_down_right,
 }
 
 def a_press():

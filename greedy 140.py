@@ -2,33 +2,30 @@ import subprocess
 from multiprocessing.connection import Listener
 from collections import defaultdict
 import numpy as np
-from colour_grapping_2 import read_rgb, classify_pixel, reward_detector,reset_reward_state
+from colour_grapping_2 import read_rgb, classify_pixel, reward_detector, reset_reward_state
 import pickle
 
 # Change these paths to your own felk-dolphin version, your just dance 2 game and our slave-script
 Felk_dolphin_exe = r"C:/Users/esben/Downloads/dolphin-scripting-preview4-x64/dolphin"
-Game_path    = r"C:/Users/esben/Downloads/dolphin-2512-x64/Dolphin-x64/spil/Just_dance2.wbfs"
-Slave_path = r"C:/Users/esben/OneDrive/Documents/GitHub/Just-Dance-Project/slavetest.py"
+Game_path        = r"C:/Users/esben/Downloads/dolphin-2512-x64/Dolphin-x64/spil/Just_dance2.wbfs"
+Slave_path       = r"C:/Users/esben/OneDrive/Documents/GitHub/Just-Dance-Project/slavetest.py"
 
-n_actions = 19
+AGENT_PATH = "agent_140.pkl"   # <-- opens this file
+
+N_ACTIONS = 27
 
 def default_value():
-    return np.zeros(n_actions, dtype=np.float32)
+    return np.zeros(N_ACTIONS, dtype=np.float32)
 
 Q = defaultdict(default_value)
-E = defaultdict(default_value)  # eligibility traces
+E = defaultdict(default_value)  # eligibility traces (kept, but not used when greedy-only)
 
 alpha = 0.05
 gamma = 0.95
 lam = 0.90
 
-eps = 1.0
-eps_min = 0.05
-eps_decay = 0.995  # pr episode
-
-def epsilon_greedy(state):
-    if np.random.rand() < eps:
-        return np.random.randint(n_actions)
+# NOTE: Greedy run (no exploration)
+def greedy(state: int) -> int:
     return int(np.argmax(Q[state]))
 
 def state_from_phase(phase):
@@ -36,19 +33,16 @@ def state_from_phase(phase):
 
 episode_count = 0
 
-song_moves = 97 #233 for the long version
+song_moves = 97  # 233 for the long version
 
 phase = 0
 state = state_from_phase(phase)
 
-# clear traces at start of episode
 E.clear()
 
-a = epsilon_greedy(state)
+a = greedy(state)
 
 ep_reward = 0.0
-
-#reward_lock = threading.Lock()
 reward_acc = 0.0
 
 def q_stats(Q):
@@ -65,46 +59,45 @@ def q_stats(Q):
 
 def add_reward(reward: float):
     global reward_acc
-    #with reward_lock:
     reward_acc += reward
 
 def pop_reward() -> float:
     global reward_acc
-    #with reward_lock:
     reward = reward_acc
     reward_acc = 0.0
     return reward
 
-def save_agent(path="agent.pkl"):
-    data = {
-        "Q": dict(Q),            # convert defaultdict -> normal dict
-        "eps": eps,
-        "episode_count": episode_count,
-    }
-    with open(path, "wb") as f:
-        pickle.dump(data, f)
+#def save_agent(path="agent.pkl"):
+#    data = {
+#        "Q": dict(Q),
+#        "episode_count": episode_count,
+#    }
+#    with open(path, "wb") as f:
+#        pickle.dump(data, f)
 
-def load_agent(path="agent.pkl"):
-    global eps, episode_count
+def load_agent(path=AGENT_PATH):
+    global episode_count
     with open(path, "rb") as f:
         data = pickle.load(f)
+
     Q.clear()
     for k, v in data["Q"].items():
-        Q[k] = v
-    eps = data.get("eps", eps)
+        # ensure numpy arrays (safety if pickle contains lists)
+        Q[k] = np.array(v, dtype=np.float32)
+
     episode_count = data.get("episode_count", episode_count)
 
 try:
     load_agent()
-    print("[Master] Agent loaded")
+    print(f"[Master] Agent loaded from: {AGENT_PATH}")
+    print("[Master] Q stats:", q_stats(Q))
 except FileNotFoundError:
-    print("[Master] No saved agent found, starting fresh")
+    print(f"[Master] Could not find {AGENT_PATH}. Put it next to this script or change AGENT_PATH.")
+    raise
 
-# --- NEW: run conn loop in a thread ---
+# --- run conn loop ---
 def dolphin_conn_loop(conn):
-    global eps, episode_count
-    global phase, state, a, ep_reward
-
+    global phase, state, a, ep_reward, episode_count
 
     moves = 0
     total_frames = 0
@@ -112,72 +105,51 @@ def dolphin_conn_loop(conn):
 
     # start first action
     conn.send(("send", int(a)))
+
     while True:
         reply, payload = conn.recv()
-        
+
         if ready:
-            reward,moves,total_frames = reward_detector()
+            reward, moves, total_frames = reward_detector()
             if reward is not None:
                 add_reward(reward)
 
-        if reply == "Dancing" and moves < song_moves and (total_frames<1300 or ready == False):
+        if reply == "Dancing" and moves < song_moves and (total_frames < 2000 or ready is False):
 
-            if payload['B'] and payload['A']: #automatisk reset 
-
-                print("episode:",episode_count)
+            if payload.get("B") and payload.get("A"):  # automatic reset / new run
+                print("episode:", episode_count)
                 moves = 0
                 phase = 0
                 total_frames = 0
                 ready = True
-                state = state_from_phase(phase)
 
-                E.clear()
-                a = epsilon_greedy(state)
+                state = state_from_phase(phase)
+                a = greedy(state)     # <-- greedy action
 
                 ep_reward = 0.0
-
-                # decay epsilon per episode (recommended)
-                eps = max(eps_min, eps * eps_decay)
-
-                # clear any leftover reward
                 _ = pop_reward()
-                if episode_count % 5 == 0 and moves == 0:
-                    print("Q stats:", q_stats(Q), "eps:", eps)
 
             # reward observed during the last action window
             reward = pop_reward()
             ep_reward += reward
 
-            # next state (your current design: phase increments)
+            # next state
             phase += 1
             s2 = state_from_phase(phase)
 
-            # choose next action
-            a2 = epsilon_greedy(s2)
+            # next action (greedy)
+            a2 = greedy(s2)          # <-- greedy action
 
-            # SARSA(λ) TD error
-            delta = reward + gamma * Q[s2][a2] - Q[state][a]
-
-            # eligibility trace update (accumulating traces)
-            E[state][a] += 1.0
-
-            # update all traced pairs
-            for s_key in list(E.keys()):
-                Q[s_key] += alpha * delta * E[s_key]
-                E[s_key] *= gamma * lam
-                if np.max(np.abs(E[s_key])) < 1e-6:
-                    del E[s_key]
-
+            # (No learning updates in greedy evaluation mode)
             state, a = s2, a2
 
             # send next action to slave
             conn.send(("send", int(a)))
 
-            #print("ep", episode_count, "move", moves, "R", ep_reward, "eps", eps, payload)
         elif reply == "waiting":
             conn.send(("filler", ":)"))
             print(payload)
-        
+
         elif reply == "print":
             conn.send(("filler", ":)"))
             print(payload)
@@ -185,23 +157,27 @@ def dolphin_conn_loop(conn):
         else:
             if ready:
                 conn.send(("reset", ":)"))
-                if moves == song_moves:
-                    save_agent()
-                    episode_count += 1
                 reset_reward_state()
                 ready = False
                 moves = 0
                 total_frames = 0
-                print("reset")
-
+                episode_count += 1
+                print("reset (greedy run finished). total ep_reward:", ep_reward)
 
 PORT = 26330
 AUTHKEY = b"secret password"
 
 listener = Listener(("localhost", PORT), authkey=AUTHKEY)
 
-
-cmd = [Felk_dolphin_exe, "--no-python-subinterpreters", "--script", Slave_path, "-b", "--exec", Game_path]
+cmd = [
+    Felk_dolphin_exe,
+    "--no-python-subinterpreters",
+    "--script",
+    Slave_path,
+    "-b",
+    "--exec",
+    Game_path,
+]
 
 print("[Master] launching:", cmd)
 Opens_dolphin = subprocess.Popen(cmd)

@@ -10,7 +10,11 @@ Felk_dolphin_exe = r"C:/Users/esben/Downloads/dolphin-scripting-preview4-x64/dol
 Game_path    = r"C:/Users/esben/Downloads/dolphin-2512-x64/Dolphin-x64/spil/Just_dance2.wbfs"
 Slave_path = r"C:/Users/esben/OneDrive/Documents/GitHub/Just-Dance-Project/slavetest.py"
 
-n_actions = 19
+n_actions = 7
+
+song_moves = 97 #233 for the long version
+
+agent_path = "agent.pkl"
 
 def default_value():
     return np.zeros(n_actions, dtype=np.float32)
@@ -35,8 +39,6 @@ def state_from_phase(phase):
     return phase  # state is just phase index
 
 episode_count = 0
-
-song_moves = 97 #233 for the long version
 
 phase = 0
 state = state_from_phase(phase)
@@ -75,7 +77,9 @@ def pop_reward() -> float:
     reward_acc = 0.0
     return reward
 
-def save_agent(path="agent.pkl"):
+
+
+def save_agent(path=agent_path):
     data = {
         "Q": dict(Q),            # convert defaultdict -> normal dict
         "eps": eps,
@@ -84,7 +88,7 @@ def save_agent(path="agent.pkl"):
     with open(path, "wb") as f:
         pickle.dump(data, f)
 
-def load_agent(path="agent.pkl"):
+def load_agent(path=agent_path):
     global eps, episode_count
     with open(path, "rb") as f:
         data = pickle.load(f)
@@ -122,7 +126,7 @@ def dolphin_conn_loop(conn):
 
         if reply == "Dancing" and moves < song_moves and (total_frames<1300 or ready == False):
 
-            if payload['B'] and payload['A']: #automatisk reset 
+            if payload['B'] and payload['A']: #Resets if A and B is pressed, which happens at the end of reset in the slave
 
                 print("episode:",episode_count)
                 moves = 0
@@ -144,6 +148,7 @@ def dolphin_conn_loop(conn):
                 if episode_count % 5 == 0 and moves == 0:
                     print("Q stats:", q_stats(Q), "eps:", eps)
 
+            #Start of SARSA
             # reward observed during the last action window
             reward = pop_reward()
             ep_reward += reward
@@ -170,20 +175,15 @@ def dolphin_conn_loop(conn):
 
             state, a = s2, a2
 
+            #E.clear()
+
             # send next action to slave
             conn.send(("send", int(a)))
 
-            #print("ep", episode_count, "move", moves, "R", ep_reward, "eps", eps, payload)
-        elif reply == "waiting":
-            conn.send(("filler", ":)"))
-            print(payload)
-        
-        elif reply == "print":
-            conn.send(("filler", ":)"))
-            print(payload)
 
         else:
             if ready:
+                #Resets the game
                 conn.send(("reset", ":)"))
                 if moves == song_moves:
                     save_agent()

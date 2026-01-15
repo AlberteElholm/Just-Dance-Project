@@ -10,9 +10,9 @@ Felk_dolphin_exe = r"C:/Users/esben/Downloads/dolphin-scripting-preview4-x64/dol
 Game_path        = r"C:/Users/esben/Downloads/dolphin-2512-x64/Dolphin-x64/spil/Just_dance2.wbfs"
 Slave_path       = r"C:/Users/esben/OneDrive/Documents/GitHub/Just-Dance-Project/slavetest.py"
 
-AGENT_PATH = "agent_140.pkl"   # <-- opens this file
+AGENT_PATH = "agent.pkl"   # <-- opens this file
 
-N_ACTIONS = 27
+N_ACTIONS = 7
 
 def default_value():
     return np.zeros(N_ACTIONS, dtype=np.float32)

@@ -54,9 +54,9 @@ ACTIONS = {
     1: left,  2: right,  3: up,    4: down,  5: forward,  6: backward,
 
     # 2D
-    7: up_left,    8: up_right,    9: down_left,    10: down_right,
-    11: forward_up, 12: forward_down, 13: forward_left, 14: forward_right,
-    15: backward_up, 16: backward_down, 17: backward_left, 18: backward_right,
+    #7: up_left,    8: up_right,    9: down_left,    10: down_right,
+    #11: forward_up, 12: forward_down, 13: forward_left, 14: forward_right,
+    #15: backward_up, 16: backward_down, 17: backward_left, 18: backward_right,
 
     # 3D
     #19: forward_up_left,   20: forward_up_right,
@@ -127,13 +127,13 @@ while True:
             continue
     
     if cmd == "reset":
-        await wait_frames(600)
+        await wait_frames(700)
 
         if episode_count < 2:
             episode_count += 1
             await a_sequence(hold_frames=200, repeats=2)
         else:
-            await a_sequence(hold_frames=20, repeats=1)
+            await a_sequence(hold_frames=30, repeats=1)
 
         await wait_frames(100)
 

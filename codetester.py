@@ -10,11 +10,11 @@ Felk_dolphin_exe = r"C:/Users/esben/Downloads/dolphin-scripting-preview4-x64/dol
 Game_path    = r"C:/Users/esben/Downloads/dolphin-2512-x64/Dolphin-x64/spil/Just_dance2.wbfs"
 Slave_path = r"C:/Users/esben/OneDrive/Documents/GitHub/Just-Dance-Project/slavetest.py"
 
-n_actions = 7
+n_actions = 18
 
 song_moves = 97 #233 for the long version
 
-agent_path = "agent.pkl"
+agent_path = "agent_100_1d_2.pkl"
 
 def default_value():
     return np.zeros(n_actions, dtype=np.float32)
@@ -30,15 +30,23 @@ eps = 1.0
 eps_min = 0.05
 eps_decay = 0.995  # pr episode
 
+episode_count = 0
+
 def epsilon_greedy(state):
-    if np.random.rand() < eps:
-        return np.random.randint(n_actions)
-    return int(np.argmax(Q[state]))
+    global eps
+    if episode_count <= 500:
+        if np.random.rand() < eps:
+            return np.random.randint(7)
+        return int(np.argmax(Q[state]))
+    else:
+        if episode_count == 785:
+            eps = 0.3
+        if np.random.rand() < eps:
+            return np.random.randint(n_actions)
+        return int(np.argmax(Q[state]))
 
 def state_from_phase(phase):
     return phase  # state is just phase index
-
-episode_count = 0
 
 phase = 0
 state = state_from_phase(phase)
@@ -153,7 +161,7 @@ def dolphin_conn_loop(conn):
             reward = pop_reward()
             ep_reward += reward
 
-            # next state (your current design: phase increments)
+            # next state (current design: phase increments)
             phase += 1
             s2 = state_from_phase(phase)
 

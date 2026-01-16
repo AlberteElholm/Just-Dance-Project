@@ -9,29 +9,33 @@ conn = Client(("localhost", PORT), authkey=AUTHKEY)
 conn.send("READY")
 
 frames_per_action = 4
-base = 100.0  # desired acceleration vector length (magnitude)
+base = 100.0  # REQUIRED final magnitude
 
 # -------------------------
-# Acceleration helpers
+# Acceleration helpers (always final magnitude == base)
 # -------------------------
 def set_accel(controller_id: int, x: float, y: float, z: float):
     controller.set_wiimote_acceleration(controller_id, x, y, z)
 
+def _norm3(x: float, y: float, z: float) -> float:
+    return math.sqrt(x * x + y * y + z * z)
+
+def _normalize_to_base(x: float, y: float, z: float):
+    n = _norm3(x, y, z)
+    if n == 0:
+        return 0.0, 0.0, 0.0
+    s = base / n
+    return x * s, y * s, z * s
+
 def _set_dir(controller_id: int, dx: float, dy: float, dz: float):
-    """Scale (dx,dy,dz) to have length == base (unless it's the zero vector)."""
-    norm = math.sqrt(dx * dx + dy * dy + dz * dz)
-    if norm == 0:
-        set_accel(controller_id, 0, 0, 0)
-        return
-    s = base / norm
-    set_accel(controller_id, dx * s, dy * s, dz * s)
+    x, y, z = _normalize_to_base(dx, dy, dz)
+    set_accel(controller_id, x, y, z)
 
 # -------------------------
-# Actions (ESTABLISHED NAMES)
+# Actions (ESTABLISHED NAMES, 1D only)
 # -------------------------
 def idle():          set_accel(0, 0, 0, 0)
 
-# 1D
 def left():          _set_dir(0, -1, 0, 0)
 def right():         _set_dir(0,  1, 0, 0)
 def up():            _set_dir(0,  0, 1, 0)
@@ -39,50 +43,50 @@ def down():          _set_dir(0,  0,-1, 0)
 def forward():       _set_dir(0,  0, 0, 1)
 def backward():      _set_dir(0,  0, 0,-1)
 
-# 2D
-def up_left():       _set_dir(0, -1,  1, 0)
-def up_right():      _set_dir(0,  1,  1, 0)
-def down_left():     _set_dir(0, -1, -1, 0)
-def down_right():    _set_dir(0,  1, -1, 0)
-
-def forward_up():    _set_dir(0,  0,  1,  1)
-def forward_down():  _set_dir(0,  0, -1,  1)
-def forward_left():  _set_dir(0, -1,  0,  1)
-def forward_right(): _set_dir(0,  1,  0,  1)
-
-def backward_up():   _set_dir(0,  0,  1, -1)
-def backward_down(): _set_dir(0,  0, -1, -1)
-def backward_left(): _set_dir(0, -1,  0, -1)
-def backward_right():_set_dir(0,  1,  0, -1)
-
-# 3D
-def forward_up_left():    _set_dir(0, -1,  1,  1)
-def forward_up_right():   _set_dir(0,  1,  1,  1)
-def forward_down_left():  _set_dir(0, -1, -1,  1)
-def forward_down_right(): _set_dir(0,  1, -1,  1)
-
-def backward_up_left():   _set_dir(0, -1,  1, -1)
-def backward_up_right():  _set_dir(0,  1,  1, -1)
-def backward_down_left(): _set_dir(0, -1, -1, -1)
-def backward_down_right():_set_dir(0,  1, -1, -1)
-
+# Map 0..6 (idle + 6 directions)
 ACTIONS = {
     0: idle,
-
-    1: left,  2: right,  3: up,   4: down,  5: forward,  6: backward,
-
-    7: up_left,    8: up_right,    9: down_left,    10: down_right,
-    11: forward_up, 12: forward_down, 13: forward_left, 14: forward_right,
-    15: backward_up, 16: backward_down, 17: backward_left, 18: backward_right,
-
-    19: forward_up_left,   20: forward_up_right,
-    21: forward_down_left, 22: forward_down_right,
-    23: backward_up_left,  24: backward_up_right,
-    25: backward_down_left,26: backward_down_right,
+    1: left,  2: right,  3: up,  4: down,  5: forward,  6: backward,
 }
 
+# For send2 composition: translate action id -> unit direction (not scaled)
+# (idle returns 0-vector)
+DIRS = {
+    0: (0.0,  0.0,  0.0),
+    1: (-1.0, 0.0,  0.0),
+    2: (1.0,  0.0,  0.0),
+    3: (0.0,  1.0,  0.0),
+    4: (0.0, -1.0,  0.0),
+    5: (0.0,  0.0,  1.0),
+    6: (0.0,  0.0, -1.0),
+}
+
+def do_send(a_id: int):
+    # Single-vector mode: magnitude==base (or zero for idle)
+    fn = ACTIONS.get(a_id, idle)
+    fn()
+
+def do_send2(base_id: int, add_id: int):
+    # Two-vector mode:
+    #   - each component vector is normalized to base (unless idle)
+    #   - sum them
+    #   - normalize the SUM to base (so final magnitude always base)
+    bx, by, bz = DIRS.get(int(base_id), (0.0, 0.0, 0.0))
+    ax, ay, az = DIRS.get(int(add_id),  (0.0, 0.0, 0.0))
+
+    # normalize each to base (idle stays zero)
+    bx, by, bz = _normalize_to_base(bx, by, bz)
+    ax, ay, az = _normalize_to_base(ax, ay, az)
+
+    sx, sy, sz = (bx + ax), (by + ay), (bz + az)
+
+    # normalize final sum to base (or zero if sum is zero)
+    sx, sy, sz = _normalize_to_base(sx, sy, sz)
+
+    set_accel(0, sx, sy, sz)
+
 # -------------------------
-# Buttons / pointer helpers
+# Buttons / pointer helpers (unchanged)
 # -------------------------
 def a_press():
     controller.set_wiimote_buttons(0, {"A": True})
@@ -120,7 +124,7 @@ async def a_sequence(hold_frames: int, repeats: int):
         await event.frameadvance()
 
 # -------------------------
-# Main loop
+# Main loop (supports "send" and "send2")
 # -------------------------
 startup = 0
 episode_count = 0
@@ -129,6 +133,7 @@ while True:
     cmd, payload = conn.recv()
 
     if cmd == "send":
+        # Startup A+B once (same behavior you had)
         if controller.get_wiimote_buttons(0).get("B", False) and startup < 1:
             a_press()
             b_press()
@@ -138,12 +143,25 @@ while True:
             a_release()
             b_release()
 
-        if payload in ACTIONS:
-            for _ in range(frames_per_action):
-                await event.frameadvance()
-                ACTIONS[payload]()  # now always magnitude==base for 2D/3D too
-            conn.send(("Dancing", controller.get_wiimote_buttons(0)))
-            continue
+        # payload is an int action id (0..6)
+        a_id = int(payload)
+        for _ in range(frames_per_action):
+            await event.frameadvance()
+            do_send(a_id)
+        conn.send(("Dancing", controller.get_wiimote_buttons(0)))
+        continue
+
+    if cmd == "send2":
+        # payload is (base_id, add_id), each 0..6
+        base_id, add_id = payload
+        base_id = int(base_id)
+        add_id  = int(add_id)
+
+        for _ in range(frames_per_action):
+            await event.frameadvance()
+            do_send2(base_id, add_id)
+        conn.send(("Dancing", controller.get_wiimote_buttons(0)))
+        continue
 
     if cmd == "reset":
         await wait_frames(800)
@@ -156,7 +174,11 @@ while True:
 
         await wait_frames(100)
 
+        # Signal master that reset finished (A+B pressed)
         a_press(); b_press()
         await event.frameadvance()
         a_press(); b_press()
         conn.send(("Dancing", controller.get_wiimote_buttons(0)))
+        # (Optional) release after signaling
+        a_release(); b_release()
+        continue

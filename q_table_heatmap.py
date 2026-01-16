@@ -6,7 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # ===== CONFIG =====
-PKL_PATH = "agent.pkl"   # change if needed
+PKL_PATH = "agent_100_1d_2.pkl"   # change if needed
 # Optional: give your 27 actions names (otherwise indices are used)
 ACTION_NAMES = None
 # Example:

@@ -4,23 +4,37 @@ from collections import defaultdict
 import numpy as np
 from colour_grapping_2 import read_rgb, classify_pixel, reward_detector,reset_reward_state
 import pickle
+from pathlib import Path
+import csv
 
 # Change these paths to your own felk-dolphin version, your just dance 2 game and our slave-script
 Felk_dolphin_exe = r"C:/Users/esben/Downloads/dolphin-scripting-preview4-x64/dolphin"
 Game_path    = r"C:/Users/esben/Downloads/dolphin-2512-x64/Dolphin-x64/spil/Just_dance2.wbfs"
 Slave_path = r"C:/Users/esben/OneDrive/Documents/GitHub/Just-Dance-Project/slavetest.py"
 
+LOG_CSV = Path("episode_rewards2.csv")
+LOG_PNG = Path("episode_rewards2.png")
+episode_reward_total = 0.0  # running total for current episode
+
 n_actions = 18
 
 song_moves = 97 #233 for the long version
 
-agent_path = "agent_100_1d_2.pkl"
+agent_path = "agent_for_reward.pkl"
 
 def default_value():
     return np.zeros(n_actions, dtype=np.float32)
 
 Q = defaultdict(default_value)
 E = defaultdict(default_value)  # eligibility traces
+
+def log_episode_reward(ep: int, total: float, path=LOG_CSV):
+    new_file = not path.exists()
+    with open(path, "a", newline="") as f:
+        w = csv.writer(f)
+        if new_file:
+            w.writerow(["episode", "episode_reward"])
+        w.writerow([ep, float(total)])
 
 alpha = 0.05
 gamma = 0.95
@@ -34,16 +48,16 @@ episode_count = 0
 
 def epsilon_greedy(state):
     global eps
-    if episode_count <= 500:
-        if np.random.rand() < eps:
-            return np.random.randint(7)
-        return int(np.argmax(Q[state]))
-    else:
-        if episode_count == 785:
-            eps = 0.3
-        if np.random.rand() < eps:
-            return np.random.randint(n_actions)
-        return int(np.argmax(Q[state]))
+    #if episode_count <= 500:
+    if np.random.rand() < eps:
+        return np.random.randint(7)
+    return int(np.argmax(Q[state]))
+#    else:
+#        if episode_count == 785:
+#            eps = 0.3
+#        if np.random.rand() < eps:
+#            return np.random.randint(n_actions)
+#        return int(np.argmax(Q[state]))
 
 def state_from_phase(phase):
     return phase  # state is just phase index
@@ -115,7 +129,7 @@ except FileNotFoundError:
 # --- NEW: run conn loop in a thread ---
 def dolphin_conn_loop(conn):
     global eps, episode_count
-    global phase, state, a, ep_reward
+    global phase, state, a, ep_reward, episode_reward_total
 
 
     moves = 0
@@ -135,7 +149,7 @@ def dolphin_conn_loop(conn):
         if reply == "Dancing" and moves < song_moves and (total_frames<1300 or ready == False):
 
             if payload['B'] and payload['A']: #Resets if A and B is pressed, which happens at the end of reset in the slave
-
+                episode_reward_total = 0.0
                 print("episode:",episode_count)
                 moves = 0
                 phase = 0
@@ -160,6 +174,7 @@ def dolphin_conn_loop(conn):
             # reward observed during the last action window
             reward = pop_reward()
             ep_reward += reward
+            episode_reward_total += reward
 
             # next state (current design: phase increments)
             phase += 1
@@ -194,8 +209,24 @@ def dolphin_conn_loop(conn):
                 #Resets the game
                 conn.send(("reset", ":)"))
                 if moves == song_moves:
+                    log_episode_reward(episode_count, episode_reward_total)
                     save_agent()
                     episode_count += 1
+                    try:
+                        import matplotlib.pyplot as plt
+                        import pandas as pd
+
+                        df = pd.read_csv(LOG_CSV)
+                        plt.figure()
+                        plt.plot(df["episode"], df["episode_reward"])
+                        plt.xlabel("episode_count")
+                        plt.ylabel("episode_reward")
+                        plt.tight_layout()
+                        plt.savefig(LOG_PNG)
+                        plt.close()
+                    except Exception as e:
+                        print("[LOG] plot skipped:", e)
+
                 reset_reward_state()
                 ready = False
                 moves = 0

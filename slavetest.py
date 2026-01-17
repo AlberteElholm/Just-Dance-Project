@@ -146,7 +146,7 @@ while True:
             continue
 
     if cmd == "reset":
-        await wait_frames(800)
+        await wait_frames(1000)
 
         if episode_count < 2:
             episode_count += 1

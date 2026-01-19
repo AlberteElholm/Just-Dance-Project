@@ -8,7 +8,7 @@ AUTHKEY = b"secret password"
 conn = Client(("localhost", PORT), authkey=AUTHKEY)
 conn.send("READY")
 
-frames_per_action = 4
+frames_per_action = 5
 base = 100.0  # desired acceleration vector length (magnitude)
 
 # -------------------------

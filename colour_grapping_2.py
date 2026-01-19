@@ -7,7 +7,7 @@ m = mouse.Controller()
 Pixel_x = 287  
 Pixel_y = 422 
 
-cd_frames = 10
+cd_frames = 6
 
 armed = True
 

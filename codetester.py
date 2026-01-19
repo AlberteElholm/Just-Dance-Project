@@ -12,15 +12,15 @@ Felk_dolphin_exe = r"C:/Users/esben/Downloads/dolphin-scripting-preview4-x64/dol
 Game_path    = r"C:/Users/esben/Downloads/dolphin-2512-x64/Dolphin-x64/spil/Just_dance2.wbfs"
 Slave_path = r"C:/Users/esben/OneDrive/Documents/GitHub/Just-Dance-Project/slavetest.py"
 
-LOG_CSV = Path("episode_rewards2.csv")
-LOG_PNG = Path("episode_rewards2.png")
+LOG_CSV = Path("episode_rewards_5frames.csv")
+LOG_PNG = Path("episode_rewards_5frames.png")
 episode_reward_total = 0.0  # running total for current episode
 
-n_actions = 18
+n_actions = 7
 
 song_moves = 97 #233 for the long version
 
-agent_path = "agent_for_reward.pkl"
+agent_path = "agent_for_reward_5frames.pkl"
 
 def default_value():
     return np.zeros(n_actions, dtype=np.float32)
@@ -48,16 +48,10 @@ episode_count = 0
 
 def epsilon_greedy(state):
     global eps
-    #if episode_count <= 500:
     if np.random.rand() < eps:
-        return np.random.randint(7)
+        return np.random.randint(n_actions)
     return int(np.argmax(Q[state]))
-#    else:
-#        if episode_count == 785:
-#            eps = 0.3
-#        if np.random.rand() < eps:
-#            return np.random.randint(n_actions)
-#        return int(np.argmax(Q[state]))
+
 
 def state_from_phase(phase):
     return phase  # state is just phase index
@@ -146,7 +140,7 @@ def dolphin_conn_loop(conn):
             if reward is not None:
                 add_reward(reward)
 
-        if reply == "Dancing" and moves < song_moves and (total_frames<1300 or ready == False):
+        if reply == "Dancing" and moves < song_moves and (total_frames<1000 or ready == False):
 
             if payload['B'] and payload['A']: #Resets if A and B is pressed, which happens at the end of reset in the slave
                 episode_reward_total = 0.0

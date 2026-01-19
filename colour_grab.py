@@ -1,13 +1,14 @@
 import mss
 import time
 from pynput import mouse
+import config
 m = mouse.Controller()
 
-#Pixel value for reading reward
-Pixel_x = 287  
-Pixel_y = 422 
+#Pixel value for reading reward, works for 1080x1920 screens. maybe on less than 144hz
+Pixel_x = config.Pixel_x
+Pixel_y = config.Pixel_y
 
-cd_frames = 6
+cd_frames = round(32/config.frames_per_action)
 
 armed = True
 

@@ -8,10 +8,8 @@ AUTHKEY = b"secret password"
 conn = Client(("localhost", PORT), authkey=AUTHKEY)
 conn.send("READY")
 
-cmd, payload = conn.recv()
-
-frames_per_action, base = payload
-  # desired acceleration vector length (magnitude)
+frames_per_action = 5
+base = 100.0  # default magnitude for normalized actions
 
 # -------------------------
 # Acceleration helpers
@@ -19,14 +17,18 @@ frames_per_action, base = payload
 def set_accel(controller_id: int, x: float, y: float, z: float):
     controller.set_wiimote_acceleration(controller_id, x, y, z)
 
-def _set_dir(controller_id: int, dx: float, dy: float, dz: float):
-    """Scale (dx,dy,dz) to have length == base (unless it's the zero vector)."""
+def _set_dir_mag(controller_id: int, dx: float, dy: float, dz: float, mag: float):
+    """Scale (dx,dy,dz) to have length == mag (unless it's the zero vector)."""
     norm = math.sqrt(dx * dx + dy * dy + dz * dz)
     if norm == 0:
         set_accel(controller_id, 0, 0, 0)
         return
-    s = base / norm
+    s = mag / norm
     set_accel(controller_id, dx * s, dy * s, dz * s)
+
+def _set_dir(controller_id: int, dx: float, dy: float, dz: float):
+    """Scale (dx,dy,dz) to have length == base (unless it's the zero vector)."""
+    _set_dir_mag(controller_id, dx, dy, dz, base)
 
 # -------------------------
 # Actions (ESTABLISHED NAMES)
@@ -83,6 +85,23 @@ ACTIONS = {
     25: backward_down_left,26: backward_down_right,
 }
 
+# For the NEW master:
+# - Stage1 sends ("send", int_dir_id 0..6)  -> we execute using magnitude 100
+# - Stage2 sends ("sendm", (dir_id 0..6, magnitude)) -> we execute same direction with chosen magnitude
+DIRS_1D = {
+    0: (0.0,  0.0,  0.0),   # idle
+    1: (-1.0, 0.0,  0.0),   # left
+    2: (1.0,  0.0,  0.0),   # right
+    3: (0.0,  1.0,  0.0),   # up
+    4: (0.0, -1.0,  0.0),   # down
+    5: (0.0,  0.0,  1.0),   # forward
+    6: (0.0,  0.0, -1.0),   # backward
+}
+
+def do_dir_mag(dir_id: int, mag: float):
+    dx, dy, dz = DIRS_1D.get(int(dir_id), (0.0, 0.0, 0.0))
+    _set_dir_mag(0, dx, dy, dz, float(mag))
+
 # -------------------------
 # Buttons / pointer helpers
 # -------------------------
@@ -122,7 +141,10 @@ async def a_sequence(hold_frames: int, repeats: int):
         await event.frameadvance()
 
 # -------------------------
-# Main loop
+# Main loop (compatible with NEW master)
+#  - supports: "send", "sendm", "reset"
+#  - reset replies with ("ResetDone", buttons_dict)
+#  - keeps your startup B->(A+B once) behavior
 # -------------------------
 startup = 0
 episode_count = 0
@@ -131,21 +153,45 @@ while True:
     cmd, payload = conn.recv()
 
     if cmd == "send":
+        # One-time startup: if user holds B, tap A+B once
         if controller.get_wiimote_buttons(0).get("B", False) and startup < 1:
             a_press()
             b_press()
             startup += 1
             await event.frameadvance()
+            # respond once so master doesn't stall
             conn.send(("Dancing", controller.get_wiimote_buttons(0)))
             a_release()
             b_release()
 
-        if payload in ACTIONS:
-            for _ in range(frames_per_action):
-                await event.frameadvance()
-                ACTIONS[payload]()  # now always magnitude==base for 2D/3D too
-            conn.send(("Dancing", controller.get_wiimote_buttons(0)))
-            continue
+        # NEW master stage1 sends 0..6 (1D only). Keep it robust.
+        dir_id = int(payload)
+
+        for _ in range(frames_per_action):
+            await event.frameadvance()
+            # if 0..6: do magnitude=100 with dir vectors
+            if 0 <= dir_id <= 6:
+                do_dir_mag(dir_id, 100.0)
+            else:
+                # fallback: allow old 2D/3D action ids if they show up
+                fn = ACTIONS.get(dir_id, idle)
+                fn()
+
+        conn.send(("Dancing", controller.get_wiimote_buttons(0)))
+        continue
+
+    if cmd == "sendm":
+        # NEW master stage2 sends (dir_id 0..6, magnitude)
+        dir_id, mag = payload
+        dir_id = int(dir_id)
+        mag = float(mag)
+
+        for _ in range(frames_per_action):
+            await event.frameadvance()
+            do_dir_mag(dir_id, mag)
+
+        conn.send(("Dancing", controller.get_wiimote_buttons(0)))
+        continue
 
     if cmd == "reset":
         await wait_frames(1000)
@@ -158,7 +204,16 @@ while True:
 
         await wait_frames(100)
 
-        a_press(); b_press()
+        # Keep your A+B press (menu interaction), but DO NOT use it as start marker anymore
+        a_press()
+        b_press()
         await event.frameadvance()
-        a_press(); b_press()
-        conn.send(("Dancing", controller.get_wiimote_buttons(0)))
+        a_release()
+        b_release()
+
+        # IMPORTANT: explicit, reliable episode-start marker for the new master
+        conn.send(("ResetDone", controller.get_wiimote_buttons(0)))
+        continue
+
+    # Unknown command: reply so master doesn't hang
+    conn.send(("Dancing", controller.get_wiimote_buttons(0)))

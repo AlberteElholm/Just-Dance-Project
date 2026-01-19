@@ -2,25 +2,29 @@ import subprocess
 from multiprocessing.connection import Listener
 from collections import defaultdict
 import numpy as np
-from colour_grapping_2 import read_rgb, classify_pixel, reward_detector,reset_reward_state
+from colour_grab import reward_detector,reset_reward_state
 import pickle
 from pathlib import Path
 import csv
+import config
 
 # Change these paths to your own felk-dolphin version, your just dance 2 game and our slave-script
-Felk_dolphin_exe = r"C:/Users/esben/Downloads/dolphin-scripting-preview4-x64/dolphin"
-Game_path    = r"C:/Users/esben/Downloads/dolphin-2512-x64/Dolphin-x64/spil/Just_dance2.wbfs"
-Slave_path = r"C:/Users/esben/OneDrive/Documents/GitHub/Just-Dance-Project/slavetest.py"
+Felk_dolphin_exe = config.Felk_dolphin_exe
+Game_path    = config.Game_path
+Slave_path = "slavetest.py"
 
-LOG_CSV = Path("episode_rewards_5frames.csv")
-LOG_PNG = Path("episode_rewards_5frames.png")
-episode_reward_total = 0.0  # running total for current episode
+log_path = config.log_path
 
-n_actions = 7
+LOG_CSV = Path(f"{log_path}.csv")
+LOG_PNG = Path(f"{log_path}.png")
 
-song_moves = 97 #233 for the long version
+agent_path = config.agent_path
 
-agent_path = "agent_for_reward_5frames.pkl"
+n_actions = config.n_actions
+
+song_moves = config.song_moves
+
+greedy = config.greedy
 
 def default_value():
     return np.zeros(n_actions, dtype=np.float32)
@@ -36,18 +40,21 @@ def log_episode_reward(ep: int, total: float, path=LOG_CSV):
             w.writerow(["episode", "episode_reward"])
         w.writerow([ep, float(total)])
 
-alpha = 0.05
-gamma = 0.95
-lam = 0.90
+alpha = config.alpha
+gamma = config.gamma
+lam = config.lam
 
-eps = 1.0
-eps_min = 0.05
-eps_decay = 0.995  # pr episode
+eps = config.eps_start
+eps_min = config.eps_min
+eps_decay = config.eps_decay
 
 episode_count = 0
 
 def epsilon_greedy(state):
-    global eps
+    global eps, greedy
+    if greedy:
+        return int(np.argmax(Q[state]))
+
     if np.random.rand() < eps:
         return np.random.randint(n_actions)
     return int(np.argmax(Q[state]))
@@ -66,8 +73,9 @@ a = epsilon_greedy(state)
 
 ep_reward = 0.0
 
-#reward_lock = threading.Lock()
 reward_acc = 0.0
+
+episode_reward_total = 0.0  # running total for current episode
 
 def q_stats(Q):
     if len(Q) == 0:
@@ -127,7 +135,7 @@ def dolphin_conn_loop(conn):
 
 
     moves = 0
-    total_frames = 0
+    total_phases = 0
     ready = False
 
     # start first action
@@ -136,18 +144,18 @@ def dolphin_conn_loop(conn):
         reply, payload = conn.recv()
         
         if ready:
-            reward,moves,total_frames = reward_detector()
+            reward,moves,total_phases = reward_detector()
             if reward is not None:
                 add_reward(reward)
 
-        if reply == "Dancing" and moves < song_moves and (total_frames<1000 or ready == False):
+        if reply == "Dancing" and moves < song_moves and (total_phases<config.total_song_phases or ready == False):
 
             if payload['B'] and payload['A']: #Resets if A and B is pressed, which happens at the end of reset in the slave
                 episode_reward_total = 0.0
                 print("episode:",episode_count)
                 moves = 0
                 phase = 0
-                total_frames = 0
+                total_phases = 0
                 ready = True
                 state = state_from_phase(phase)
 
@@ -224,7 +232,7 @@ def dolphin_conn_loop(conn):
                 reset_reward_state()
                 ready = False
                 moves = 0
-                total_frames = 0
+                total_phases = 0
                 print("reset")
 
 
@@ -245,6 +253,9 @@ print("[Master] connected")
 
 msg = conn.recv()
 print("[Master] received handshake:", msg)
+
+conn.send(("preaparing",(config.frames_per_action,config.base)))
+
 
 if __name__ == "__main__":
     dolphin_conn_loop(conn)

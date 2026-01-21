@@ -1,7 +1,7 @@
 import mss
 import config
 
-#Pixel value for reading reward, works for 1080x1920 screens. maybe on less than 144hz
+#Pixel value for reading reward, works for 1920x1080 screens. maybe on less than 144hz
 Pixel_x = config.Pixel_x
 Pixel_y = config.Pixel_y
 

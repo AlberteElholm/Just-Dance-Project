@@ -8,7 +8,6 @@ from pathlib import Path
 import csv
 import config
 
-# Change these paths to your own felk-dolphin version, your just dance 2 game and our slave-script
 Felk_dolphin_exe = config.Felk_dolphin_exe
 Game_path    = config.Game_path
 Slave_path = "Slave.py"
@@ -30,7 +29,7 @@ def default_value():
     return np.zeros(n_actions, dtype=np.float32)
 
 Q = defaultdict(default_value)
-E = defaultdict(default_value)  # eligibility traces
+E = defaultdict(default_value)
 
 def log_episode_reward(ep: int, total: float, path=LOG_CSV):
     new_file = not path.exists()
@@ -50,6 +49,7 @@ eps_decay = config.eps_decay
 
 episode_count = 0
 
+# If greedy=True then this is just greedy policy
 def epsilon_greedy(state):
     global eps, greedy
     if greedy:
@@ -61,26 +61,24 @@ def epsilon_greedy(state):
 
 
 def state_from_phase(phase):
-    return phase  # state is just phase index
+    return phase
 
 phase = 0
 state = state_from_phase(phase)
 
-# clear traces at start of episode
+# clear traces of reward at start of episode
 E.clear()
 
 a = epsilon_greedy(state)
 
 ep_reward = 0.0
-
-reward_acc = 0.0
-
-episode_reward_total = 0.0  # running total for current episode
+reward_acc = 0.0 # accumulated reward
+episode_reward_total = 0.0 #total reward given every episode, to plot.
 
 def q_stats(Q):
     if len(Q) == 0:
         return "Q is empty"
-    arr = np.stack([Q[s] for s in Q.keys()], axis=0)  # (num_states, 27)
+    arr = np.stack([Q[s] for s in Q.keys()], axis=0)
     return {
         "num_states": arr.shape[0],
         "min": float(arr.min()),
@@ -91,12 +89,10 @@ def q_stats(Q):
 
 def add_reward(reward: float):
     global reward_acc
-    #with reward_lock:
     reward_acc += reward
 
 def pop_reward() -> float:
     global reward_acc
-    #with reward_lock:
     reward = reward_acc
     reward_acc = 0.0
     return reward
@@ -105,7 +101,7 @@ def pop_reward() -> float:
 
 def save_agent(path=agent_path):
     data = {
-        "Q": dict(Q),            # convert defaultdict -> normal dict
+        "Q": dict(Q),
         "eps": eps,
         "episode_count": episode_count,
     }
@@ -128,21 +124,20 @@ try:
 except FileNotFoundError:
     print("[Master] No saved agent found, starting fresh")
 
-# --- NEW: run conn loop in a thread ---
+#main loop
 def dolphin_conn_loop(conn):
     global eps, episode_count
     global phase, state, a, ep_reward, episode_reward_total
-
 
     moves = 0
     total_phases = 0
     ready = False
 
-    # start first action
     conn.send(("send", int(a)))
     while True:
+        #waits for message from slave
         reply, payload = conn.recv()
-        
+        #checks for reward
         if ready:
             reward,moves,total_phases = reward_detector()
             if reward is not None:
@@ -164,21 +159,21 @@ def dolphin_conn_loop(conn):
 
                 ep_reward = 0.0
 
-                # decay epsilon per episode (recommended)
+                # decays epsilon per episode
                 eps = max(eps_min, eps * eps_decay)
 
                 # clear any leftover reward
                 _ = pop_reward()
+                # Prints stats for the q-table every 5 episodes
                 if episode_count % 5 == 0 and moves == 0:
                     print("Q stats:", q_stats(Q), "eps:", eps)
 
             #Start of SARSA
-            # reward observed during the last action window
             reward = pop_reward()
             ep_reward += reward
             episode_reward_total += reward
 
-            # next state (current design: phase increments)
+            # next state
             phase += 1
             s2 = state_from_phase(phase)
 
@@ -199,8 +194,6 @@ def dolphin_conn_loop(conn):
                     del E[s_key]
 
             state, a = s2, a2
-
-            #E.clear()
 
             # send next action to slave
             conn.send(("send", int(a)))
@@ -254,6 +247,7 @@ print("[Master] connected")
 msg = conn.recv()
 print("[Master] received handshake:", msg)
 
+# Sends the relevent config values to the slave.
 conn.send(("preaparing",(config.frames_per_action,config.base)))
 
 

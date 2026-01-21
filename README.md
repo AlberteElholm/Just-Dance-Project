@@ -1,7 +1,5 @@
 # Just Dance Project
 
-# Overview:
-
 # Downloads:
 1. Download this repository.
 2. Download Just dance 2 for the Wii.
@@ -9,12 +7,13 @@
 Under releases -> Assets. THere should be a file named dolphin-scripting-preview4-x64.7z
 
 # Initial setup:
-1. Open config from this repository.
-2. Find the path for Just dance 2 and Felk's version of Dolphin, and replace the existing path with yours in config.
-3. Open Felk's version of Dolphin. dolphin-scripting-preview4-x64\Dolphin.exe
-4. In Dolphin, find the path for Just dance 2 and add it.
-5. Right-click on Just dance 2, and choose properties -> Game Config -> Editor -> Under SD2.ini, press Presets -> Edtior -> Open in External Editor. Write this under [Core]: EmulationSpeed = 10.0. You can change this value.
-6. Close Dolphin
+1. Open config from this repository in a code editor such as VSCode.
+2. Find the paths for Just dance 2 and Felk's version of Dolphin, and replace the existing paths with yours in config.
+3. Open Felk's version of Dolphin. (dolphin-scripting-preview4-x64\Dolphin.exe)
+4. In Dolphin, find the path for Just dance 2 and add it by clicking on the right side.
+5. Right-click on Just dance 2, and choose properties -> Game Config -> Editor -> Under Default config (SD2.ini), press Presets -> Edtior -> Open in External Editor. Write this under [Core]: (EmulationSpeed = 10.0). You can change this value.
+6. Open controllers -> Configure Wii remote 1 -> General and Options -> Extention -> From Nunchuck to None.
+7. Close Dolphin
 
 # Running the Game:
 You can control the wii game with your curser as pointer, left-click is A-button and right-click is the B-button.

@@ -1,8 +1,5 @@
 import mss
-import time
-from pynput import mouse
 import config
-m = mouse.Controller()
 
 #Pixel value for reading reward, works for 1080x1920 screens. maybe on less than 144hz
 Pixel_x = config.Pixel_x
@@ -77,7 +74,3 @@ def reward_detector():
         return None,moves,total_frames
     
 
-# Helps to find the right pixel to read:
-#while True:
-#    print(m.position,read_rgb(m.position[0],m.position[1]),classify_pixel(read_rgb(m.position[0],m.position[1])[0],read_rgb(m.position[0],m.position[1])[1],read_rgb(m.position[0],m.position[1])[2]))
-#    time.sleep(0.3)

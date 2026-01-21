@@ -21,10 +21,10 @@ song_moves = 97 #233 for the long version
 total_song_frames = 5100
 total_song_phases = round(total_song_frames/frames_per_action)
 # Files, if no file it will create one
-agent_path = "q-tables/100_5frames.pkl"
-log_path = "results/5frames_1d.pkl"
+agent_path = "q-tables/100_1d.pkl"
+log_path = "results/4_frames_new.pkl"
 
-#Pixel value for reading reward, works for 1080x1920 screens. maybe on less than 144hz
+#Pixel value for reading reward, works for 1080x1920 screens. maybe on less than 144Hz
 Pixel_x = 287  
 Pixel_y = 422
 

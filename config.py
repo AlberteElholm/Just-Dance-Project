@@ -16,7 +16,7 @@ eps_decay = 0.995
 
 # Environment / game settings
 base = 100 # acceleration 100=10m/s^2
-frames_per_action = 5 # amount of frames before a new action is taken
+frames_per_action = 4 # amount of frames before a new action is taken
 song_moves = 97 #233 for the long version
 total_song_frames = 5100
 total_song_phases = round(total_song_frames/frames_per_action)
@@ -24,7 +24,7 @@ total_song_phases = round(total_song_frames/frames_per_action)
 agent_path = "q-tables/100_1d.pkl"
 log_path = "results/4_frames_new.pkl"
 
-#Pixel value for reading reward, works for 1920x1080 screens. If this doesn't work, use the inial_pixel_finder.py tool.
+#Pixel value for reading reward, works for 1920x1080 screens. If this doesn't work, use the pixel_finder.py tool.
 Pixel_x = 287  
 Pixel_y = 422
 

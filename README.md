@@ -18,9 +18,10 @@ Under releases -> Assets. THere should be a file named dolphin-scripting-preview
 # Running the Game:
 You can control the wii game with your curser as pointer, left-click is A-button and right-click is the B-button.
 1. Run Master.py
-2. In the song selection menu, change the song length to short in the top left corner.
-3. Find "Girlfriend" By Avril Lavigne
-4. Choose the song, click past "Press 'A' to skip" and hold right-click to start the song and learning. (This step sometimes fails. You can either just close the game and try again, or wait a second or two, and left-click to start it anyway. It will correct itself after a song or two.)
+2. Make the game full screen
+3. In the song selection menu, change the song length to short in the top left corner.
+4. Find "Girlfriend" By Avril Lavigne
+5. Choose the song, click past "Press 'A' to skip" and hold right-click to start the song and learning. (This step sometimes fails. You can either just close the game and try again, or wait a second or two, and left-click to start it anyway. It will correct itself after a song or two.)
 It should now be running and be able to reset automatically.
 
 # When running:

@@ -4,7 +4,7 @@
 1. Download this repository.
 2. Download Just dance 2 for the Wii.
 3. Download Felk's version of Dolphin emulator https://github.com/Felk/dolphin. 
-Under releases -> Assets. THere should be a file named dolphin-scripting-preview4-x64.7z
+Under releases -> Assets. There should be a file named dolphin-scripting-preview4-x64.7z
 
 # Initial setup:
 1. Open config from this repository in a code editor such as VSCode.

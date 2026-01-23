@@ -30,7 +30,7 @@ keep your mouse on the game, and don't click, as it can disturb the learning.
 If you have two screens, you can look at your results update live.
 
 # Possible Issues:
-Finding the right pixel. We have used a 1920x1080 screen on windows 11. If you have a different resolution or OS, you need to manually find a pixel that works. We've made a tool to help you find the right pixel, called Initial_pixel_finder.py. You need to find a pixel position (x,y), that includes all colour values when you recieve a reward.
+Finding the right pixel. We have used a 1920x1080 screen on windows 11. If you have a different resolution or OS, you need to manually find a pixel that works. We've made a tool to help you find the right pixel, called pixel_finder.py. You need to find a pixel position (x,y), that includes all colour values when you recieve a reward.
 
 If you are training an existing agent, you need to know what values the config had when it was first changed, and match them.
 

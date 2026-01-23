@@ -3,7 +3,7 @@ import numpy as np
 from pathlib import Path
 import sys
 
-FOLDER = Path("agents")  # <-- change this
+FOLDER = Path("q-tables")  # <-- change this
 
 def describe_pkl(path: Path):
     size_mb = path.stat().st_size / (1024 ** 2)
